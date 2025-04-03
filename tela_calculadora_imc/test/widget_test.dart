@@ -1,30 +1,22 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-
-import 'package:tela_calculadora_imc/main.dart';
+import 'package:tela_calculadora_imc/calcularIMC/calculador_de_imc.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
-
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
-
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
-
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+  test("Cálculo do IMC com valores normais", () {
+    var imc = CalculadorDeImc().calcular(70, 1.75);
+    String imcFormatado = imc.toStringAsFixed(2);
+    var classificacao = CalculadorDeImc().classificacaoIMC(imc);
+    expect(imcFormatado, '22.86');
+    expect(classificacao, "Saudável");
+  });
+  test("IMC muito baixo", () {
+    var imc = CalculadorDeImc().calcular(45, 1.75);
+    var classificacao = CalculadorDeImc().classificacaoIMC(imc);
+    expect(classificacao, "Magreza grave");
+  });
+  test("IMC indicando obesidade", () {
+    var imc = CalculadorDeImc().calcular(100, 1.75);
+    var classificacao = CalculadorDeImc().classificacaoIMC(imc);
+    expect(classificacao, "Obesidade Grau I");
   });
 }
