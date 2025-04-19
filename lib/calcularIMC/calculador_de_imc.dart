@@ -1,8 +1,8 @@
-import 'package:tela_calculadora_imc/pessoa/pessoa.dart';
+import 'package:calculadora_imc/model/imc_model.dart';
 
 class CalculadorDeImc {
   static String calculadorDeImc(double peso, double altura) {
-    Pessoa pessoa = Pessoa(peso, altura);
+    ImcModel pessoa = ImcModel(peso, altura);
     double pesoPessoa = pessoa.peso;
     double alturaPessoa = pessoa.altura;
 
@@ -26,11 +26,4 @@ class CalculadorDeImc {
     if (imc < 40) return "Obesidade Grau II (severa)";
     return "Obesidade Grau III (mórbida)";
   }
-}
-
-void main() {
-  var imc = CalculadorDeImc().calcular(72, 1.69);
-  var classificacaoIMC = CalculadorDeImc().classificacaoIMC(imc);
-
-  print('IMC = $imc \nClassificação = $classificacaoIMC');
 }

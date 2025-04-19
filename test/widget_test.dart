@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:tela_calculadora_imc/calcularIMC/calculador_de_imc.dart';
+import 'package:calculadora_imc/calcularIMC/calculador_de_imc.dart';
 
 void main() {
   test("Cálculo do IMC com valores normais", () {
