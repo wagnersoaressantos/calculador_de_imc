@@ -1,5 +1,7 @@
 import 'package:calculadora_imc/calcularIMC/calculador_de_imc.dart';
+import 'package:calculadora_imc/model/configuracao_model.dart';
 import 'package:calculadora_imc/model/pessoa_model.dart';
+import 'package:calculadora_imc/repository/configuracoes_repository.dart';
 import 'package:calculadora_imc/repository/imc_repository.dart';
 import 'package:calculadora_imc/share/imagens_share.dart';
 import 'package:flutter/material.dart';
@@ -12,10 +14,27 @@ class CalcularImcPage extends StatefulWidget {
 }
 
 class _CalcularImcPageState extends State<CalcularImcPage> {
+  late ConfiguracoesRepository _configuracoesRepository;
+  late ConfiguracoesModel _configuracoesModel;
   final TextEditingController _nomePessoa = TextEditingController();
   final TextEditingController _pesoPessoa = TextEditingController();
   final TextEditingController _alturaPessoa = TextEditingController();
   final ImcRepository _repo = ImcRepository();
+  @override
+  void initState() {
+    super.initState();
+    _carregarConfiguracoes();
+  }
+
+  void _carregarConfiguracoes() async {
+    _configuracoesRepository = await ConfiguracoesRepository.load();
+    _configuracoesModel = _configuracoesRepository.pegarDados();
+
+    // Você pode preencher o nome por padrão também, se quiser
+    setState(() {
+      _nomePessoa.text = _configuracoesModel.nomeUsuario;
+    });
+  }
 
   String _resultado = "";
   bool _exibirResultado = false;
@@ -114,6 +133,16 @@ class _CalcularImcPageState extends State<CalcularImcPage> {
                       ),
                     ],
                   ),
+                ),
+                SizedBox(height: 8),
+                ElevatedButton(
+                  onPressed: () {
+                    setState(() {
+                      _alturaPessoa.text =
+                          _configuracoesModel.alturaUsuario.toString();
+                    });
+                  },
+                  child: Text('Usar altura das configurações'),
                 ),
                 SizedBox(height: 10),
                 if (_exibirResultado)

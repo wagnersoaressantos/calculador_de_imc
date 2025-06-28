@@ -1,6 +1,7 @@
 import 'package:calculadora_imc/page/calcular_imc_page.dart';
 import 'package:calculadora_imc/page/historico_imc_page.dart';
 import 'package:calculadora_imc/share/imagens_share.dart';
+import 'package:calculadora_imc/share/widget/custon_drawer.dart';
 import 'package:flutter/material.dart';
 
 class HomePage extends StatefulWidget {
@@ -16,6 +17,7 @@ class _HomePageState extends State<HomePage> {
     return SafeArea(
       child: Scaffold(
         appBar: AppBar(title: Text('Calculadora de IMC'), centerTitle: true),
+        drawer: CustonDrawer(),
         body: Container(
           padding: const EdgeInsets.all(16),
           child: Column(
