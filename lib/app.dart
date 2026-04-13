@@ -11,13 +11,28 @@ class App extends StatelessWidget {
       title: 'Calculadora de IMC',
 
       theme: ThemeData(
-        appBarTheme: AppBarTheme(
-          backgroundColor: const Color.fromRGBO(4, 238, 82, 1),
+        primarySwatch: Colors.blue,
+        scaffoldBackgroundColor: Colors.grey[100],
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Colors.blue,
+          foregroundColor: Colors.white,
+          elevation: 0,
+          centerTitle: true,
         ),
-        colorScheme: ColorScheme.fromSwatch(
-          primarySwatch: Colors.cyan,
-          accentColor: Colors.cyan,
+        cardTheme: CardThemeData(
+          elevation: 4,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
         ),
+        inputDecorationTheme: InputDecorationTheme(
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+
+        // colorScheme: ColorScheme.fromSwatch(
+        //   primarySwatch: Colors.cyan,
+        //   accentColor: Colors.cyan,
+        // ),
       ),
       home: const HomePage(), // Substitua por sua página inicial
     );

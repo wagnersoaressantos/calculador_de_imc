@@ -1,8 +1,7 @@
 import 'package:calculadora_imc/calcularIMC/calculador_de_imc.dart';
 import 'package:calculadora_imc/model/configuracao_model.dart';
-import 'package:calculadora_imc/model/pessoa_model.dart';
 import 'package:calculadora_imc/repository/configuracoes_repository.dart';
-import 'package:calculadora_imc/repository/imc_repository.dart';
+import 'package:calculadora_imc/repository/pessoa_repository.dart';
 import 'package:calculadora_imc/share/imagens_share.dart';
 import 'package:flutter/material.dart';
 
@@ -19,7 +18,8 @@ class _CalcularImcPageState extends State<CalcularImcPage> {
   final TextEditingController _nomePessoa = TextEditingController();
   final TextEditingController _pesoPessoa = TextEditingController();
   final TextEditingController _alturaPessoa = TextEditingController();
-  final ImcRepository _repo = ImcRepository();
+  // final ImcRepository _repo = ImcRepository();
+  final PessoaRepository _repo = PessoaRepository();
   @override
   void initState() {
     super.initState();
@@ -105,6 +105,7 @@ class _CalcularImcPageState extends State<CalcularImcPage> {
                   child: Column(
                     children: [
                       TextField(
+                        keyboardType: TextInputType.number,
                         controller: _pesoPessoa,
                         decoration: InputDecoration(hintText: 'Peso (ex: 75)'),
                       ),
@@ -127,6 +128,7 @@ class _CalcularImcPageState extends State<CalcularImcPage> {
                     children: [
                       TextField(
                         controller: _alturaPessoa,
+                        keyboardType: TextInputType.number,
                         decoration: InputDecoration(
                           hintText: 'Altura (m) ex 1.69',
                         ),
@@ -167,7 +169,8 @@ class _CalcularImcPageState extends State<CalcularImcPage> {
                     ),
                   ),
                 SizedBox(height: 10),
-                ElevatedButton(
+                ElevatedButton.icon(
+                  label: Text("Calcular"),
                   onPressed: () {
                     if (_pesoPessoa.text.isEmpty ||
                         _alturaPessoa.text.isEmpty) {
@@ -184,17 +187,42 @@ class _CalcularImcPageState extends State<CalcularImcPage> {
                       );
                       return;
                     }
+                    // setState(() {
+                    //   _resultado = CalculadorDeImc.calculadorDeImc(
+                    //     double.tryParse(_pesoPessoa.text)!,
+                    //     double.tryParse(_alturaPessoa.text)!,
+                    //   );
+                    //   PessoaModel pessoa = PessoaModel(_nomePessoa.text);
+                    //   _repo.addImc(pessoa.nome, _resultado);
+                    //   _exibirResultado = true;
+                    // });
                     setState(() {
+                      double peso = double.tryParse(_pesoPessoa.text)!;
+                      double altura = double.tryParse(_alturaPessoa.text)!;
+
                       _resultado = CalculadorDeImc.calculadorDeImc(
-                        double.tryParse(_pesoPessoa.text)!,
-                        double.tryParse(_alturaPessoa.text)!,
+                        peso,
+                        altura,
                       );
-                      PessoaModel pessoa = PessoaModel(_nomePessoa.text);
-                      _repo.addImc(pessoa.nome, _resultado);
+
+                      _repo.adicionarRegistro(
+                        nome: _nomePessoa.text,
+                        peso: peso,
+                        altura: altura,
+                      );
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Registro salvo com sucesso!')),
+                      );
+
                       _exibirResultado = true;
                     });
                   },
-                  child: Text('Calcular'),
+                  style: ElevatedButton.styleFrom(
+                    padding: EdgeInsets.symmetric(vertical: 14, horizontal: 20),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
                 ),
                 SizedBox(height: 2),
                 if (_exibirResultado)

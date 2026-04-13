@@ -1,4 +1,5 @@
 import 'package:calculadora_imc/page/configuracoes_page.dart';
+import 'package:calculadora_imc/page/dashboard_page.dart';
 import 'package:flutter/material.dart';
 
 class CustonDrawer extends StatelessWidget {
@@ -66,6 +67,27 @@ class CustonDrawer extends StatelessWidget {
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (context) => ConfiguracoesPage()),
+              );
+            },
+          ),
+          Divider(),
+          InkWell(
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 10),
+              width: double.infinity,
+              child: Row(
+                children: [
+                  Icon(Icons.settings),
+                  SizedBox(width: 5),
+                  Text('Dashboard'),
+                ],
+              ),
+            ),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const DashboardPage()),
               );
             },
           ),

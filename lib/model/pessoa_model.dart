@@ -1,7 +1,28 @@
-// ignore_for_file: public_member_api_docs, sort_constructors_first
-//Criar classe Pessoa (Nome / Peso / Altura)​
-class PessoaModel {
+import 'package:hive/hive.dart';
+import 'registro_imc_model.dart';
+import 'atividade_model.dart';
+
+part 'pessoa_model.g.dart';
+
+@HiveType(typeId: 3)
+class PessoaModel extends HiveObject {
+
+  @HiveField(0)
   String nome;
 
-  PessoaModel(this.nome);
+  @HiveField(1)
+  double altura;
+
+  @HiveField(2)
+  List<RegistroImcModel> registros;
+
+  @HiveField(3)
+  List<AtividadeModel> atividades;
+
+  PessoaModel({
+    required this.nome,
+    required this.altura,
+    required this.registros,
+    required this.atividades,
+  });
 }

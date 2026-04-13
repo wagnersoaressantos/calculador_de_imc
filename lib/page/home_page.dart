@@ -1,3 +1,4 @@
+import 'package:calculadora_imc/page/atividade_page.dart';
 import 'package:calculadora_imc/page/calcular_imc_page.dart';
 import 'package:calculadora_imc/page/historico_imc_page.dart';
 import 'package:calculadora_imc/share/imagens_share.dart';
@@ -64,6 +65,28 @@ class _HomePageState extends State<HomePage> {
                             children: [
                               Expanded(child: Image.asset(ImagensShare.imc)),
                               Text('Lista de IMC'),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    GestureDetector(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const AtividadePage(),
+                          ),
+                        );
+                      },
+
+                      child: Card(
+                        child: Container(
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            children: [
+                              Expanded(child: Image.asset(ImagensShare.imc)),
+                              Text('Atividades'),
                             ],
                           ),
                         ),
