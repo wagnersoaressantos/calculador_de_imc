@@ -1,0 +1,34 @@
+lib
+|___calculadoraIMC
+|   |__calculador_de_imc.dart
+|
+|___controller
+|___images
+|   |__imc.png
+|
+|___model
+|   |__configuracao_model.dart
+|   |__guardar_imc_model.dart
+|   |__guardar_imc_model.g.dart
+|   |__imc_model.dart
+|   |__pessoa_model.dart
+|   
+|___page
+|   |__calcular_imc_page.dart
+|   |__configuracoes_page.dart
+|   |__historico_imc_page.dart
+|   |__home_page.dart
+|
+|___repository
+|   |__configuracoes_repository.dart
+|   |__imc_repository.dart
+|
+|___service
+|___share
+|   |___widget
+|   |   |__custon_drawer.dart
+|   |
+|   |___imagens_share.dart
+|
+|___app.dart
+|___main.dart
