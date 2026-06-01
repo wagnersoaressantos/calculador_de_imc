@@ -1,5 +1,6 @@
 import 'package:calculadora_imc/model/atividade_model.dart';
 import 'package:calculadora_imc/repository/pessoa_repository.dart';
+import 'package:calculadora_imc/service_locator.dart';
 import 'package:flutter/material.dart';
 
 class AtividadePage extends StatefulWidget {
@@ -23,8 +24,7 @@ class _AtividadePageState extends State<AtividadePage> {
   String _intensidadeSelecionada = "Leve";
 
   // 🔹 Repository para salvar os dados
-  final PessoaRepository _repo = PessoaRepository();
-
+final _repo = getIt<PessoaRepository>();
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -132,12 +132,15 @@ class _AtividadePageState extends State<AtividadePage> {
                   0, // altura não importa aqui (já pode existir)
                 );
 
-                // 🔹 Adiciona atividade na pessoa
-                pessoa.atividades.add(atividade);
-
-                // 🔹 Salva no Hive
-                pessoa.save();
-
+                if (pessoa != null) {
+                  pessoa.atividades.add(atividade);
+                  pessoa.save();
+                } else {
+                  // Opcional: Mostrar um SnackBar de erro se a pessoa não for encontrada
+                  debugPrint(
+                    "Erro: Pessoa retornou nula ao tentar salvar atividade.",
+                  );
+                }
                 // 🔹 Feedback pro usuário
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text("Atividade salva com sucesso!")),

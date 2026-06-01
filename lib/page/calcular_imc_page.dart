@@ -2,6 +2,7 @@ import 'package:calculadora_imc/calcularIMC/calculador_de_imc.dart';
 import 'package:calculadora_imc/model/configuracao_model.dart';
 import 'package:calculadora_imc/repository/configuracoes_repository.dart';
 import 'package:calculadora_imc/repository/pessoa_repository.dart';
+import 'package:calculadora_imc/service_locator.dart';
 import 'package:calculadora_imc/share/imagens_share.dart';
 import 'package:flutter/material.dart';
 
@@ -20,8 +21,7 @@ class _CalcularImcPageState extends State<CalcularImcPage> {
   final TextEditingController _pesoPessoa = TextEditingController();
   final TextEditingController _alturaPessoa = TextEditingController();
 
-  final PessoaRepository _repo = PessoaRepository();
-
+  final _repo = getIt<PessoaRepository>();
   // NOVO: Chave global para identificar e validar o nosso Formulário
   final _formKey = GlobalKey<FormState>();
 

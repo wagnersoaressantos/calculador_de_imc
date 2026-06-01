@@ -3,6 +3,7 @@ import 'package:calculadora_imc/model/pessoa_model.dart';
 import 'package:calculadora_imc/model/registro_imc_model.dart'; // Adicionado para aceder ao modelo
 import 'package:calculadora_imc/page/calcular_imc_page.dart';
 import 'package:calculadora_imc/repository/pessoa_repository.dart';
+import 'package:calculadora_imc/service_locator.dart';
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart'; // Importante: O pacote do gráfico
 
@@ -14,7 +15,7 @@ class HistoricoImcPage extends StatefulWidget {
 }
 
 class _HistoricoImcPageState extends State<HistoricoImcPage> {
-  final PessoaRepository _repo = PessoaRepository();
+  final _repo = getIt<PessoaRepository>();
   List<PessoaModel> _listaPessoas = [];
 
   @override

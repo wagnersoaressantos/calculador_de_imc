@@ -5,6 +5,7 @@ import 'package:calculadora_imc/model/registro_imc_model.dart';
 import 'package:calculadora_imc/repository/pessoa_repository.dart';
 import 'package:calculadora_imc/service/atividade_analise_service.dart';
 import 'package:calculadora_imc/service/imc_analise_service.dart';
+import 'package:calculadora_imc/service_locator.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 
@@ -16,7 +17,7 @@ class DashboardPage extends StatefulWidget {
 }
 
 class _DashboardPageState extends State<DashboardPage> {
-  final PessoaRepository _repo = PessoaRepository();
+  final _repo = getIt<PessoaRepository>();
   final _analise = ImcAnaliseService();
   final _atividadeAnalise = AtividadeAnaliseService();
 
