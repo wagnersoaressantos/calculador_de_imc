@@ -1,9 +1,17 @@
 import 'package:calculadora_imc/page/atividade_page.dart';
 import 'package:calculadora_imc/page/calcular_imc_page.dart';
+import 'package:calculadora_imc/page/historico_atividade_page.dart';
 import 'package:calculadora_imc/page/historico_imc_page.dart';
+import 'package:calculadora_imc/page/dashboard_page.dart'; // NOVO: Importamos o seu Dashboard
 import 'package:calculadora_imc/share/imagens_share.dart';
 import 'package:calculadora_imc/share/widget/custon_drawer.dart';
 import 'package:flutter/material.dart';
+
+// NOVOS IMPORTS para Inteligência e Dados
+import 'package:calculadora_imc/model/pessoa_model.dart';
+import 'package:calculadora_imc/repository/pessoa_repository.dart';
+import 'package:calculadora_imc/service_locator.dart';
+import 'package:calculadora_imc/calcularIMC/calculador_de_imc.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -13,43 +21,145 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
+  // 1. Chamamos a nossa Caixa de Ferramentas
+  final _repo = getIt<PessoaRepository>();
+  PessoaModel? _usuarioPrincipal;
+
+  @override
+  void initState() {
+    super.initState();
+    _carregarDados();
+  }
+
+  // 2. Função para buscar os dados e descobrir quem é o usuário principal
+  void _carregarDados() {
+    final pessoas = _repo.listarPessoas();
+    setState(() {
+      if (pessoas.isNotEmpty) {
+        // Para simplificar, pegamos a primeira pessoa cadastrada para o resumo
+        _usuarioPrincipal = pessoas.first;
+      }
+    });
+  }
+
+  // 3. O CÉREBRO DA TELA: O Widget do Resumo Rápido
+  Widget _construirPainelResumo() {
+    if (_usuarioPrincipal == null) {
+      return const Center(
+        child: Text(
+          "Bem-vindo! Cadastre um IMC para ver o seu resumo aqui.",
+          style: TextStyle(color: Colors.grey, fontStyle: FontStyle.italic),
+          textAlign: TextAlign.center,
+        ),
+      );
+    }
+
+    // Extrair dados com segurança
+    final pessoa = _usuarioPrincipal!;
+    double ultimoImc = 0.0;
+    String classificacao = "Sem dados";
+    double caloriasTotais = 0.0;
+
+    if (pessoa.registros.isNotEmpty) {
+      ultimoImc = pessoa.registros.last.imc;
+      classificacao = CalculadorDeImc.classificacaoIMC(ultimoImc);
+    }
+
+    for (var atividade in pessoa.atividades) {
+      caloriasTotais += atividade.caloriasGastas ?? 0.0;
+    }
+
+    // Desenhar o Cartão de Saudação
+    return Card(
+      elevation: 4,
+      color: Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.all(20.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              "Olá, ${pessoa.nome}! 👋",
+              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+            ),
+            const Divider(height: 30, thickness: 1),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const CircleAvatar(
+                backgroundColor: Colors.blueAccent,
+                child: Icon(Icons.monitor_weight, color: Colors.white),
+              ),
+              title: const Text("Último IMC Registado"),
+              subtitle: Text(
+                ultimoImc > 0
+                    ? "${ultimoImc.toStringAsFixed(1)} - $classificacao"
+                    : "Nenhum registo",
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const CircleAvatar(
+                backgroundColor: Colors.orange,
+                child: Icon(Icons.local_fire_department, color: Colors.white),
+              ),
+              title: const Text("Total de Calorias Queimadas"),
+              subtitle: Text(
+                "${caloriasTotais.toStringAsFixed(0)} kcal",
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.orange,
+                  fontSize: 16,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return SafeArea(
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Calculadora de IMC'),
+          title: const Text('Saúde & IMC'), // Um nome mais envolvente!
           centerTitle: true,
+          elevation: 0,
         ),
         drawer: const CustonDrawer(),
         body: Container(
           padding: const EdgeInsets.all(16),
           child: Column(
             children: [
-              // Substituímos a Row pelo Wrap envolto num Container de largura total
               SizedBox(
-                width:
-                    double
-                        .infinity, // Diz ao Wrap para usar toda a largura da tela
+                width: double.infinity,
                 child: Wrap(
-                  alignment:
-                      WrapAlignment.center, // Centraliza os cartões na tela
-                  spacing: 16.0, // Espaçamento horizontal entre os cartões
-                  runSpacing:
-                      16.0, // Espaçamento vertical (quando um cartão cai para a linha de baixo)
+                  alignment: WrapAlignment.center,
+                  spacing: 16.0,
+                  runSpacing: 16.0,
                   children: [
-                    // 1º Cartão com tamanho fixo
+                    // 1º Cartão: Calculadora
                     SizedBox(
-                      width: 100, // Largura fixa do cartão
-                      height: 120, // Altura fixa do cartão
+                      width: 100,
+                      height: 120,
                       child: GestureDetector(
-                        onTap: () {
-                          Navigator.push(
+                        // O 'await' faz a tela recarregar sozinha quando voltar!
+                        onTap: () async {
+                          await Navigator.push(
                             context,
                             MaterialPageRoute(
                               builder: (context) => const CalcularImcPage(),
                             ),
                           );
+                          _carregarDados();
                         },
                         child: Card(
                           child: Container(
@@ -71,18 +181,19 @@ class _HomePageState extends State<HomePage> {
                       ),
                     ),
 
-                    // 2º Cartão com tamanho fixo
+                    // 2º Cartão: Lista de IMC
                     SizedBox(
                       width: 100,
                       height: 120,
                       child: GestureDetector(
-                        onTap: () {
-                          Navigator.push(
+                        onTap: () async {
+                          await Navigator.push(
                             context,
                             MaterialPageRoute(
                               builder: (context) => const HistoricoImcPage(),
                             ),
                           );
+                          _carregarDados();
                         },
                         child: Card(
                           child: Container(
@@ -104,18 +215,20 @@ class _HomePageState extends State<HomePage> {
                       ),
                     ),
 
-                    // 3º Cartão com tamanho fixo
+                    // 3º Cartão: Atividades
                     SizedBox(
                       width: 100,
                       height: 120,
                       child: GestureDetector(
-                        onTap: () {
-                          Navigator.push(
+                        onTap: () async {
+                          await Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) => const AtividadePage(),
+                              builder:
+                                  (context) => const HistoricoAtividadePage(),
                             ),
                           );
+                          _carregarDados();
                         },
                         child: Card(
                           child: Container(
@@ -137,11 +250,60 @@ class _HomePageState extends State<HomePage> {
                       ),
                     ),
 
-                    // Experimente adicionar um 4º cartão aqui depois para ver a magia acontecer!
+                    // 🔥 4º Cartão: Dashboard
+                    SizedBox(
+                      width: 100,
+                      height: 120,
+                      child: GestureDetector(
+                        onTap: () async {
+                          await Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const DashboardPage(),
+                            ),
+                          );
+                          _carregarDados();
+                        },
+                        child: Card(
+                          color:
+                              Colors
+                                  .blue[50], // Uma corzinha de fundo para destacar!
+                          child: Container(
+                            padding: const EdgeInsets.all(8),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Expanded(
+                                  child: Icon(
+                                    Icons.analytics,
+                                    size: 40,
+                                    color: Colors.blue,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                const Text(
+                                  'Dashboard',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
-              Expanded(flex: 3, child: Container()),
+
+              const SizedBox(height: 30), // Espaço de respiro
+              // O NOSSO NOVO PAINEL DE RESUMO ENTRA AQUI, PREENCHENDO O RESTO DA TELA!
+              Expanded(
+                child: SingleChildScrollView(child: _construirPainelResumo()),
+              ),
             ],
           ),
         ),

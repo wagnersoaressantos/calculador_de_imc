@@ -11,30 +11,58 @@ class AtividadePage extends StatefulWidget {
 }
 
 class _AtividadePageState extends State<AtividadePage> {
-  // 🔹 Controller para capturar o nome da pessoa
   final TextEditingController _nomeController = TextEditingController();
-
-  // 🔹 Controller para capturar a duração
   final TextEditingController _duracaoController = TextEditingController();
 
-  // 🔹 Tipo de atividade selecionado
   String _tipoSelecionado = "Caminhada";
-
-  // 🔹 Intensidade selecionada
   String _intensidadeSelecionada = "Leve";
 
-  // 🔹 Repository para salvar os dados
-final _repo = getIt<PessoaRepository>();
+  final _repo = getIt<PessoaRepository>();
+
+  // 🔥 NOVO: O "Cérebro" que calcula as calorias usando a tabela MET
+  double _calcularCalorias(
+    String tipo,
+    String intensidade,
+    int duracaoMinutos,
+    double peso,
+  ) {
+    double met = 3.0; // Valor padrão de segurança
+
+    if (tipo == "Caminhada") {
+      if (intensidade == "Leve")
+        met = 2.5;
+      else if (intensidade == "Moderada")
+        met = 3.8;
+      else
+        met = 5.0; // Alta
+    } else if (tipo == "Corrida") {
+      if (intensidade == "Leve")
+        met = 6.0;
+      else if (intensidade == "Moderada")
+        met = 8.0;
+      else
+        met = 10.0;
+    } else if (tipo == "Academia") {
+      if (intensidade == "Leve")
+        met = 3.0;
+      else if (intensidade == "Moderada")
+        met = 5.0;
+      else
+        met = 6.0;
+    }
+
+    // Fórmula: MET * Peso * Tempo em Horas
+    return met * peso * (duracaoMinutos / 60.0);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text("Registrar Atividade")),
-
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            // 🔹 Campo de nome
             TextField(
               controller: _nomeController,
               decoration: const InputDecoration(
@@ -42,10 +70,7 @@ final _repo = getIt<PessoaRepository>();
                 border: OutlineInputBorder(),
               ),
             ),
-
             const SizedBox(height: 10),
-
-            // 🔹 Dropdown de tipo de atividade
             DropdownButtonFormField<String>(
               initialValue: _tipoSelecionado,
               decoration: const InputDecoration(
@@ -59,16 +84,9 @@ final _repo = getIt<PessoaRepository>();
                             DropdownMenuItem(value: tipo, child: Text(tipo)),
                       )
                       .toList(),
-              onChanged: (value) {
-                setState(() {
-                  _tipoSelecionado = value!;
-                });
-              },
+              onChanged: (value) => setState(() => _tipoSelecionado = value!),
             ),
-
             const SizedBox(height: 10),
-
-            // 🔹 Campo de duração
             TextField(
               controller: _duracaoController,
               keyboardType: TextInputType.number,
@@ -77,10 +95,7 @@ final _repo = getIt<PessoaRepository>();
                 border: OutlineInputBorder(),
               ),
             ),
-
             const SizedBox(height: 10),
-
-            // 🔹 Dropdown de intensidade
             DropdownButtonFormField<String>(
               initialValue: _intensidadeSelecionada,
               decoration: const InputDecoration(
@@ -94,19 +109,14 @@ final _repo = getIt<PessoaRepository>();
                             DropdownMenuItem(value: nivel, child: Text(nivel)),
                       )
                       .toList(),
-              onChanged: (value) {
-                setState(() {
-                  _intensidadeSelecionada = value!;
-                });
-              },
+              onChanged:
+                  (value) => setState(() => _intensidadeSelecionada = value!),
             ),
-
             const SizedBox(height: 20),
 
-            // 🔥 BOTÃO DE SALVAR
+            // 🔥 BOTÃO DE SALVAR REFORMULADO
             ElevatedButton(
               onPressed: () {
-                // 🔹 Validação simples
                 if (_nomeController.text.isEmpty ||
                     _duracaoController.text.isEmpty) {
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -115,38 +125,56 @@ final _repo = getIt<PessoaRepository>();
                   return;
                 }
 
-                // 🔹 Converte duração para int
                 final duracao = int.tryParse(_duracaoController.text) ?? 0;
-
-                // 🔹 Cria objeto de atividade
-                final atividade = AtividadeModel(
-                  tipo: _tipoSelecionado,
-                  duracao: duracao,
-                  intensidade: _intensidadeSelecionada,
-                  data: DateTime.now(), // salva data atual automaticamente
-                );
-
-                // 🔹 Busca ou cria a pessoa
                 final pessoa = _repo.obterOuCriarPessoa(
                   _nomeController.text,
-                  0, // altura não importa aqui (já pode existir)
+                  0,
                 );
 
                 if (pessoa != null) {
+                  // 1. Inteligência: Buscar o último peso da pessoa
+                  double pesoAtual =
+                      70.0; // Peso "chutado" se for um usuário virgem
+                  if (pessoa.registros.isNotEmpty) {
+                    // Pega o peso do último registro de IMC feito na outra tela!
+                    pesoAtual = pessoa.registros.last.peso;
+                  }
+
+                  // 2. Calcula as calorias com base no peso real
+                  double calorias = _calcularCalorias(
+                    _tipoSelecionado,
+                    _intensidadeSelecionada,
+                    duracao,
+                    pesoAtual,
+                  );
+
+                  // 3. Cria a atividade incluindo as calorias
+                  final atividade = AtividadeModel(
+                    tipo: _tipoSelecionado,
+                    duracao: duracao,
+                    intensidade: _intensidadeSelecionada,
+                    data: DateTime.now(),
+                    caloriasGastas: calorias,
+                  );
+
                   pessoa.atividades.add(atividade);
                   pessoa.save();
-                } else {
-                  // Opcional: Mostrar um SnackBar de erro se a pessoa não for encontrada
-                  debugPrint(
-                    "Erro: Pessoa retornou nula ao tentar salvar atividade.",
-                  );
-                }
-                // 🔹 Feedback pro usuário
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text("Atividade salva com sucesso!")),
-                );
 
-                // 🔹 Limpa os campos
+                  // 4. Mostra o Feedback super interativo e encorajador
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        "🔥 Sucesso! Você queimou cerca de ${calorias.toStringAsFixed(0)} kcal.",
+                      ),
+                      backgroundColor:
+                          Colors.orange, // Laranja combinando com fogo/calorias
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                } else {
+                  debugPrint("Erro: Pessoa retornou nula.");
+                }
+
                 _nomeController.clear();
                 _duracaoController.clear();
               },

@@ -21,13 +21,14 @@ class AtividadeModelAdapter extends TypeAdapter<AtividadeModel> {
       duracao: fields[1] as int,
       intensidade: fields[2] as String,
       data: fields[3] as DateTime,
+      caloriasGastas: fields[4] as double?,
     );
   }
 
   @override
   void write(BinaryWriter writer, AtividadeModel obj) {
     writer
-      ..writeByte(4)
+      ..writeByte(5)
       ..writeByte(0)
       ..write(obj.tipo)
       ..writeByte(1)
@@ -35,7 +36,9 @@ class AtividadeModelAdapter extends TypeAdapter<AtividadeModel> {
       ..writeByte(2)
       ..write(obj.intensidade)
       ..writeByte(3)
-      ..write(obj.data);
+      ..write(obj.data)
+      ..writeByte(4)
+      ..write(obj.caloriasGastas);
   }
 
   @override

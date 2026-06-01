@@ -162,7 +162,7 @@ class _HistoricoImcPageState extends State<HistoricoImcPage> {
                                     ),
                                     subtitle: Text(
                                       "Peso: ${registro.peso} kg\n"
-                                      "Classificação: ${CalculadorDeImc().classificacaoIMC(registro.imc)} \n"
+                                      "Classificação: ${CalculadorDeImc.classificacaoIMC(registro.imc)} \n"
                                       "Data: ${registro.data.day}/${registro.data.month}/${registro.data.year}",
                                     ),
                                   );
