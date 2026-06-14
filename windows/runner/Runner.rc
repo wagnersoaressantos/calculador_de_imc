@@ -90,12 +90,12 @@ BEGIN
         BLOCK "040904e4"
         BEGIN
             VALUE "CompanyName", "com.wagnersoares.imcapp" "\0"
-            VALUE "FileDescription", "tela_calculadora_imc" "\0"
+            VALUE "FileDescription", "IMC+" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "tela_calculadora_imc" "\0"
+            VALUE "InternalName", "IMC+" "\0"
             VALUE "LegalCopyright", "Copyright (C) 2025 com.wagnersoares.imcapp. All rights reserved." "\0"
-            VALUE "OriginalFilename", "tela_calculadora_imc.exe" "\0"
-            VALUE "ProductName", "tela_calculadora_imc" "\0"
+            VALUE "OriginalFilename", "IMC+.exe" "\0"
+            VALUE "ProductName", "IMC+" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

@@ -118,56 +118,185 @@ class _HistoricoImcPageState extends State<HistoricoImcPage> {
                 itemCount: _listaPessoas.length,
                 itemBuilder: (_, index) {
                   final pessoa = _listaPessoas[index];
-                  return Card(
-                    margin: const EdgeInsets.all(8),
-                    child: ExpansionTile(
-                      title: Text(
-                        pessoa.nome,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 18,
-                        ),
-                      ),
-                      // Aqui alteramos a forma como os 'children' são construídos
-                      children:
-                          pessoa.registros.isEmpty
-                              ? [
-                                const Padding(
-                                  padding: EdgeInsets.all(8.0),
-                                  child: Text("Nenhum registo ainda."),
-                                ),
-                              ]
-                              : [
-                                // 1º Colocamos o nosso novo gráfico no topo!
-                                _construirGraficoEvolucao(pessoa.registros),
 
-                                // 2º Colocamos um pequeno título para a lista
-                                const Divider(),
-                                const Padding(
-                                  padding: EdgeInsets.all(8.0),
-                                  child: Text(
-                                    "Histórico Detalhado",
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
+                  // 1. Envolvemos o Cartão INTEIRO da pessoa num Dismissible
+                  return Dismissible(
+                    // Usamos a key nativa do HiveObject para identificar a pessoa
+                    key: Key(pessoa.key.toString()),
+                    direction: DismissDirection.endToStart,
+
+                    // 2. O fundo vermelho intenso para indicar PERIGO (Excluir Tudo)
+                    background: Container(
+                      color: Colors.red[800],
+                      alignment: Alignment.centerRight,
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: const Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.delete_forever,
+                            color: Colors.white,
+                            size: 30,
+                          ),
+                          Text(
+                            "Apagar Utilizador",
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // 3. O TRAVÃO DE SEGURANÇA: Confirmação antes de apagar
+                    confirmDismiss: (direction) async {
+                      // Retorna um showDialog que devolve true (apaga) ou false (cancela)
+                      return await showDialog(
+                        context: context,
+                        builder: (BuildContext context) {
+                          return AlertDialog(
+                            title: const Text("Excluir Utilizador?"),
+                            content: Text(
+                              "Tem a certeza que deseja apagar '${pessoa.nome}'?\n\n"
+                              "⚠️ Todo o histórico de IMC e Atividades será perdido para sempre.",
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed:
+                                    () => Navigator.of(
+                                      context,
+                                    ).pop(false), // Cancela
+                                child: const Text("Cancelar"),
+                              ),
+                              ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.red,
+                                ),
+                                onPressed:
+                                    () => Navigator.of(
+                                      context,
+                                    ).pop(true), // Confirma a exclusão
+                                child: const Text(
+                                  "Sim, Excluir",
+                                  style: TextStyle(color: Colors.white),
+                                ),
+                              ),
+                            ],
+                          );
+                        },
+                      );
+                    },
+
+                    // 4. Se o utilizador clicou em "Sim, Excluir", esta função corre
+                    onDismissed: (direction) {
+                      // O Hive apaga o objeto inteiro do banco de dados na hora!
+                      pessoa.delete();
+
+                      // Atualizamos a lista na tela
+                      setState(() {
+                        _carregarDados();
+                      });
+
+                      // Mostramos o aviso final
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            "O perfil de ${pessoa.nome} foi apagado.",
+                          ),
+                          behavior: SnackBarBehavior.floating,
+                        ),
+                      );
+                    },
+
+                    // O Card original da pessoa fica aqui dentro
+                    child: Card(
+                      margin: const EdgeInsets.all(8),
+                      child: ExpansionTile(
+                        title: Text(
+                          pessoa.nome,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 18,
+                          ),
+                        ),
+                        children:
+                            pessoa.registros.isEmpty
+                                ? [
+                                  const Padding(
+                                    padding: EdgeInsets.all(8.0),
+                                    child: Text("Nenhum registo ainda."),
+                                  ),
+                                ]
+                                : [
+                                  _construirGraficoEvolucao(pessoa.registros),
+                                  const Divider(),
+                                  const Padding(
+                                    padding: EdgeInsets.all(8.0),
+                                    child: Text(
+                                      "Histórico Detalhado",
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                      ),
                                     ),
                                   ),
-                                ),
 
-                                // 3º Espalhamos os ListTile com os dados em texto (como já tinhas)
-                                ...pessoa.registros.map((registro) {
-                                  return ListTile(
-                                    leading: const Icon(Icons.monitor_weight),
-                                    title: Text(
-                                      "IMC: ${registro.imc.toStringAsFixed(2)}",
-                                    ),
-                                    subtitle: Text(
-                                      "Peso: ${registro.peso} kg\n"
-                                      "Classificação: ${CalculadorDeImc.classificacaoIMC(registro.imc)} \n"
-                                      "Data: ${registro.data.day}/${registro.data.month}/${registro.data.year}",
-                                    ),
-                                  );
-                                }),
-                              ],
+                                  // AQUI É O CÓDIGO ANTIGO DO DISMISSIBLE DE CADA IMC INDIVIDUAL (Que já fizemos)
+                                  ...pessoa.registros.asMap().entries.map((
+                                    entry,
+                                  ) {
+                                    int indexReg = entry.key;
+                                    var registro = entry.value;
+
+                                    return Dismissible(
+                                      key: Key(
+                                        registro.data.toString() +
+                                            indexReg.toString(),
+                                      ),
+                                      direction: DismissDirection.endToStart,
+                                      background: Container(
+                                        color: Colors.red,
+                                        alignment: Alignment.centerRight,
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 20,
+                                        ),
+                                        child: const Icon(
+                                          Icons.delete,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                      onDismissed: (direction) {
+                                        setState(() {
+                                          pessoa.registros.removeAt(indexReg);
+                                          pessoa.save();
+                                        });
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          const SnackBar(
+                                            content: Text("Registo apagado!"),
+                                            backgroundColor: Colors.redAccent,
+                                            behavior: SnackBarBehavior.floating,
+                                          ),
+                                        );
+                                      },
+                                      child: ListTile(
+                                        leading: const Icon(
+                                          Icons.monitor_weight,
+                                        ),
+                                        title: Text(
+                                          "IMC: ${registro.imc.toStringAsFixed(2)}",
+                                        ),
+                                        subtitle: Text(
+                                          "Peso: ${registro.peso} kg\n"
+                                          "Classificação: ${CalculadorDeImc.classificacaoIMC(registro.imc)} \n"
+                                          "Data: ${registro.data.day}/${registro.data.month}/${registro.data.year}",
+                                        ),
+                                      ),
+                                    );
+                                  }),
+                                ],
+                      ),
                     ),
                   );
                 },

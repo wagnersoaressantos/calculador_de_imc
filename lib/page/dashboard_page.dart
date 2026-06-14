@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:calculadora_imc/model/pessoa_model.dart';
 import 'package:calculadora_imc/model/registro_imc_model.dart';
 import 'package:calculadora_imc/repository/pessoa_repository.dart';
+import 'package:calculadora_imc/repository/configuracoes_repository.dart'; // 🔥 Importamos o repositório das metas
 import 'package:calculadora_imc/service/atividade_analise_service.dart';
 import 'package:calculadora_imc/service/imc_analise_service.dart';
 import 'package:calculadora_imc/service_locator.dart';
@@ -22,25 +23,37 @@ class _DashboardPageState extends State<DashboardPage> {
   final _atividadeAnalise = AtividadeAnaliseService();
 
   List<PessoaModel> _pessoas = [];
+
+  // 🔥 Novas variáveis para guardar a meta e o objetivo que vêm das configurações
+  double _pesoMeta = 0;
+  String _objetivo = "Manter";
+
   @override
   void initState() {
     super.initState();
     _carregarDados();
   }
 
-  void _carregarDados() {
-    _pessoas = _repo.listarPessoas();
+  // 🔥 Transformamos esta função em "async" para poder ir buscar os dados das configurações
+  void _carregarDados() async {
+    final pessoas = _repo.listarPessoas();
+
+    // Vamos ler a configuração salva pelo utilizador
+    final configRepo = await ConfiguracoesRepository.load();
+    final config = configRepo.pegarDados();
+
+    setState(() {
+      _pessoas = pessoas;
+      _pesoMeta = config.pesoMeta;
+      _objetivo = config.objetivo;
+    });
   }
 
   // 🔹 Converte registros em pontos para o gráfico
   List<FlSpot> _gerarPontos(PessoaModel pessoa) {
     List<FlSpot> pontos = [];
-
     for (int i = 0; i < pessoa.registros.length; i++) {
       final registro = pessoa.registros[i];
-
-      // eixo X = índice (tempo simplificado)
-      // eixo Y = valor do IMC
       pontos.add(FlSpot(i.toDouble(), registro.imc));
     }
     return pontos;
@@ -52,7 +65,7 @@ class _DashboardPageState extends State<DashboardPage> {
       appBar: AppBar(title: const Text('Dashboard IMC')),
       body:
           _pessoas.isEmpty
-              ? Center(child: Text("Sem dados para exibir"))
+              ? const Center(child: Text("Sem dados para exibir"))
               : ListView.builder(
                 itemCount: _pessoas.length,
                 itemBuilder: (context, index) {
@@ -79,37 +92,22 @@ class _DashboardPageState extends State<DashboardPage> {
 
                           const SizedBox(height: 20),
 
-                          // 🔥 GRÁFICO
+                          // 🔥 GRÁFICO (Mantido igual)
                           SizedBox(
                             height: 200,
                             child: LineChart(
                               LineChartData(
                                 gridData: FlGridData(show: true),
-
-                                // titlesData: FlTitlesData(
-                                //   leftTitles: AxisTitles(
-                                //     sideTitles: SideTitles(showTitles: true),
-                                //   ),
-                                //   bottomTitles: AxisTitles(
-                                //     sideTitles: SideTitles(showTitles: true),
-                                //   ),
-                                // ),
                                 borderData: FlBorderData(show: false),
-
                                 lineBarsData: [
                                   LineChartBarData(
                                     spots: _gerarPontos(pessoa),
-
                                     isCurved: true,
                                     color: Colors.blue,
-
                                     dotData: FlDotData(show: true),
-
                                     belowBarData: BarAreaData(
                                       show: true,
-                                      color: Colors.blue.withValues(
-                                        blue: 0.2,
-                                      ), // 🔥 área preenchida
+                                      color: Colors.blue.withOpacity(0.2),
                                     ),
                                   ),
                                 ],
@@ -128,7 +126,6 @@ class _DashboardPageState extends State<DashboardPage> {
                                     .toStringAsFixed(2),
                                 Icons.analytics,
                               ),
-
                               _infoBox(
                                 "Tendência",
                                 _analise.calcularTendencia(pessoa.registros),
@@ -138,7 +135,83 @@ class _DashboardPageState extends State<DashboardPage> {
                           ),
 
                           const SizedBox(height: 10),
-                          // Text(_analise.preverMeta(pessoa.registros)),
+
+                          // 🔥 O SEU NOVO CARTÃO DE META COMEÇA AQUI 🔥
+                          // Só mostra este cartão se a pessoa tiver IMCs registados e tiver configurado uma meta maior que zero
+                          if (pessoa.registros.isNotEmpty && _pesoMeta > 0)
+                            Builder(
+                              builder: (context) {
+                                final ultimoPeso = pessoa.registros.last.peso;
+                                double diferenca = ultimoPeso - _pesoMeta;
+                                String mensagem = "";
+                                Color corCartao = Colors.green;
+                                IconData iconeCartao = Icons.flag;
+
+                                // Inteligência para saber se é emagrecer, hipertrofia ou manter
+                                if (_objetivo == "Emagrecer") {
+                                  if (diferenca > 0) {
+                                    mensagem =
+                                        "Faltam ${diferenca.toStringAsFixed(1)}kg para a sua meta de $_pesoMeta kg!";
+                                    corCartao =
+                                        Colors
+                                            .orange; // Ainda não chegou, fica laranja
+                                  } else {
+                                    mensagem =
+                                        "Parabéns! Você atingiu a meta de emagrecimento!";
+                                    corCartao =
+                                        Colors.green; // Chegou, fica verde
+                                    iconeCartao =
+                                        Icons
+                                            .emoji_events; // Troca para um troféu!
+                                  }
+                                } else if (_objetivo == "Hipertrofia") {
+                                  if (diferenca < 0) {
+                                    mensagem =
+                                        "Faltam ${(diferenca * -1).toStringAsFixed(1)}kg para a sua meta de $_pesoMeta kg!";
+                                    corCartao = Colors.orange;
+                                  } else {
+                                    mensagem =
+                                        "Parabéns! Você alcançou a sua meta de ganho de massa!";
+                                    corCartao = Colors.green;
+                                    iconeCartao = Icons.emoji_events;
+                                  }
+                                } else {
+                                  mensagem =
+                                      "O seu objetivo é manter o peso na faixa saudável!";
+                                  corCartao = Colors.blue;
+                                  iconeCartao = Icons.balance;
+                                }
+
+                                return Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.all(12),
+                                  margin: const EdgeInsets.only(
+                                    bottom: 10,
+                                  ), // Espaço por baixo
+                                  decoration: BoxDecoration(
+                                    color: corCartao.withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Icon(iconeCartao, color: corCartao),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: Text(
+                                          mensagem,
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            color: corCartao,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
+                            ),
+
+                          // 🔥 FIM DO CARTÃO DE META 🔥
                           Container(
                             width: double.infinity,
                             padding: const EdgeInsets.all(12),
@@ -194,40 +267,43 @@ class _DashboardPageState extends State<DashboardPage> {
                   );
                 },
               ),
-      // body: SafeArea(
-      //   child:
-      //       pessoa == null
-      //           ? const _DashboardEmptyState(
-      //             message: 'Nenhum usuário encontrado',
-      //           )
-      //           : _registrosOrdenados.isEmpty
-      //           ? const _DashboardEmptyState(
-      //             message: 'Nenhum registro de IMC para exibir',
-      //           )
-      //           : RefreshIndicator(
-      //             onRefresh: () async {
-      //               _carregarDados();
-      //             },
-      //             child: ListView(
-      //               padding: const EdgeInsets.all(16),
-      //               children: [
-      //                 _DashboardHeader(
-      //                   nome: pessoa.nome,
-      //                   totalRegistros: _registrosOrdenados.length,
-      //                   ultimoImc: _registrosOrdenados.last.imc,
-      //                 ),
-      //                 const SizedBox(height: 16),
-      //                 _DashboardChartCard(registros: _registrosOrdenados),
-      //                 const SizedBox(height: 16),
-      //                 _RecentRecordsCard(registros: _registrosOrdenados),
-      //               ],
-      //             ),
-      //           ),
-      // ),
     );
   }
 }
 
+// OS SEUS COMPONENTES AUXILIARES FORAM MANTIDOS INTACTOS AQUI PARA BAIXO...
+
+Widget _infoBox(String titulo, String valor, IconData icone) {
+  return Expanded(
+    child: Container(
+      margin: const EdgeInsets.all(4),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: Colors.blue.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icone, color: Colors.blue),
+          const SizedBox(height: 5),
+          Text(titulo, style: const TextStyle(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 5),
+          Text(
+            valor,
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 12),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+// Pode manter as classes _DashboardHeader, _DashboardChartCard, _RecentRecordsCard e _DashboardEmptyState que tem no seu código caso precise usá-las,
+// elas não influenciam no resultado final desta listagem.
 class _DashboardHeader extends StatelessWidget {
   const _DashboardHeader({
     required this.nome,
@@ -461,35 +537,4 @@ class _DashboardEmptyState extends StatelessWidget {
       ),
     );
   }
-}
-
-Widget _infoBox(String titulo, String valor, IconData icone) {
-  return Expanded(
-    child: Container(
-      margin: const EdgeInsets.all(4),
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: Colors.blue.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icone, color: Colors.blue),
-          const SizedBox(height: 5),
-          Text(titulo, style: const TextStyle(fontWeight: FontWeight.bold)),
-          const SizedBox(height: 5),
-
-          // 🔥 CORREÇÃO PRINCIPAL
-          Text(
-            valor,
-            textAlign: TextAlign.center,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 12),
-          ),
-        ],
-      ),
-    ),
-  );
 }

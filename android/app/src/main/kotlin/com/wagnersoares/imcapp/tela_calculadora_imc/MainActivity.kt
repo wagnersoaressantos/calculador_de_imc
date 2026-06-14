@@ -1,4 +1,4 @@
-package com.wagnersoares.imcapp.tela_calculadora_imc
+package com.wagnersoares.imcapp
 
 import io.flutter.embedding.android.FlutterActivity
 

@@ -51,65 +51,67 @@ class _HistoricoAtividadePageState extends State<HistoricoAtividadePage> {
       body:
           _listaPessoas.isEmpty
               ? const Center(child: Text("Nenhum usuário cadastrado."))
-              : ListView.builder(
-                itemCount: _listaPessoas.length,
-                itemBuilder: (_, index) {
-                  final pessoa = _listaPessoas[index];
-                  return Card(
-                    margin: const EdgeInsets.all(8),
-                    child: ExpansionTile(
-                      leading: const Icon(
-                        Icons.directions_run,
-                        color: Colors.orange,
-                      ),
-                      title: Text(
-                        pessoa.nome,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 18,
+              : SafeArea(
+                child: ListView.builder(
+                  itemCount: _listaPessoas.length,
+                  itemBuilder: (_, index) {
+                    final pessoa = _listaPessoas[index];
+                    return Card(
+                      margin: const EdgeInsets.all(8),
+                      child: ExpansionTile(
+                        leading: const Icon(
+                          Icons.directions_run,
+                          color: Colors.orange,
                         ),
-                      ),
-                      children:
-                          pessoa.atividades.isEmpty
-                              ? [
-                                const Padding(
-                                  padding: EdgeInsets.all(16.0),
-                                  child: Text(
-                                    "Nenhuma atividade registrada.",
-                                    style: TextStyle(color: Colors.grey),
-                                  ),
-                                ),
-                              ]
-                              : pessoa.atividades.map((atividade) {
-                                return ListTile(
-                                  // Ícone de fogo para representar as calorias
-                                  leading: const Icon(
-                                    Icons.local_fire_department,
-                                    color: Colors.deepOrange,
-                                  ),
-                                  title: Text(
-                                    "${atividade.tipo} (${atividade.duracao} min)",
-                                  ),
-                                  subtitle: Text(
-                                    "Intensidade: ${atividade.intensidade}\n"
-                                    "Data: ${atividade.data.day}/${atividade.data.month}/${atividade.data.year}",
-                                  ),
-                                  // Mostra as calorias calculadas à direita
-                                  trailing: Text(
-                                    atividade.caloriasGastas != null
-                                        ? "${atividade.caloriasGastas!.toStringAsFixed(0)} kcal"
-                                        : "---",
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.orange,
-                                      fontSize: 16,
+                        title: Text(
+                          pessoa.nome,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 18,
+                          ),
+                        ),
+                        children:
+                            pessoa.atividades.isEmpty
+                                ? [
+                                  const Padding(
+                                    padding: EdgeInsets.all(16.0),
+                                    child: Text(
+                                      "Nenhuma atividade registrada.",
+                                      style: TextStyle(color: Colors.grey),
                                     ),
                                   ),
-                                );
-                              }).toList(),
-                    ),
-                  );
-                },
+                                ]
+                                : pessoa.atividades.map((atividade) {
+                                  return ListTile(
+                                    // Ícone de fogo para representar as calorias
+                                    leading: const Icon(
+                                      Icons.local_fire_department,
+                                      color: Colors.deepOrange,
+                                    ),
+                                    title: Text(
+                                      "${atividade.tipo} (${atividade.duracao} min)",
+                                    ),
+                                    subtitle: Text(
+                                      "Intensidade: ${atividade.intensidade}\n"
+                                      "Data: ${atividade.data.day}/${atividade.data.month}/${atividade.data.year}",
+                                    ),
+                                    // Mostra as calorias calculadas à direita
+                                    trailing: Text(
+                                      atividade.caloriasGastas != null
+                                          ? "${atividade.caloriasGastas!.toStringAsFixed(0)} kcal"
+                                          : "---",
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.orange,
+                                        fontSize: 16,
+                                      ),
+                                    ),
+                                  );
+                                }).toList(),
+                      ),
+                    );
+                  },
+                ),
               ),
     );
   }

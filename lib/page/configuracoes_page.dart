@@ -10,11 +10,15 @@ class ConfiguracoesPage extends StatefulWidget {
 }
 
 class _ConfiguracoesPageState extends State<ConfiguracoesPage> {
- late ConfiguracoesRepository configuracoesRepository;
+  late ConfiguracoesRepository configuracoesRepository;
   var configuracoesModel = ConfiguracoesModel.vazio();
 
-  TextEditingController nomeUsuarioController = TextEditingController();
-  TextEditingController alturaUsuarioController = TextEditingController();
+  final TextEditingController nomeUsuarioController = TextEditingController();
+  final TextEditingController alturaUsuarioController = TextEditingController();
+  final TextEditingController pesoMetaController =
+      TextEditingController(); // Novo
+
+  String _objetivoSelecionado = "Manter"; // Novo
 
   @override
   void initState() {
@@ -25,8 +29,12 @@ class _ConfiguracoesPageState extends State<ConfiguracoesPage> {
   void carregarDados() async {
     configuracoesRepository = await ConfiguracoesRepository.load();
     configuracoesModel = configuracoesRepository.pegarDados();
+
     nomeUsuarioController.text = configuracoesModel.nomeUsuario;
     alturaUsuarioController.text = configuracoesModel.alturaUsuario.toString();
+    pesoMetaController.text = configuracoesModel.pesoMeta.toString();
+    _objetivoSelecionado = configuracoesModel.objetivo;
+
     setState(() {});
   }
 
@@ -34,77 +42,67 @@ class _ConfiguracoesPageState extends State<ConfiguracoesPage> {
   Widget build(BuildContext context) {
     return SafeArea(
       child: Scaffold(
-        appBar: AppBar(title: Text("Cofigurações Hive")),
-        body: Container(
+        appBar: AppBar(title: const Text("Configurações")),
+        body: SafeArea(
           child: ListView(
+            padding: const EdgeInsets.all(16),
             children: [
-              Padding(
-                padding: EdgeInsets.symmetric(horizontal: 16),
-                child: TextField(
-                  decoration: InputDecoration(hintText: "Nome de usuario"),
-                  controller: nomeUsuarioController,
+              TextField(
+                controller: nomeUsuarioController,
+                decoration: const InputDecoration(
+                  labelText: "Nome de Utilizador",
                 ),
               ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: TextField(
-                  keyboardType: TextInputType.number,
-                  decoration: InputDecoration(hintText: "Altura"),
-                  controller: alturaUsuarioController,
-                ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: alturaUsuarioController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: "Altura (ex: 1.70)"),
               ),
-              // SwitchListTile(
-              //   title: Text("Receber notificações"),
-              //   value: configuracoesModel.notificacarUsuario,
-              //   onChanged: (bool value) {
-              //     setState(() {
-              //       configuracoesModel.notificacarUsuario = value;
-              //     });
-              //   },
-              // ),
-              // SwitchListTile(
-              //   title: Text("Tema escuro"),
-              //   value: configuracoesModel.temaEscuro,
-              //   onChanged: (bool value) {
-              //     setState(() {
-              //       configuracoesModel.temaEscuro = value;
-              //     });
-              //   },
-              // ),
-              TextButton(
+              const SizedBox(height: 16),
+              TextField(
+                controller: pesoMetaController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: "Peso Meta (kg)"),
+              ),
+              const SizedBox(height: 16),
+              DropdownButtonFormField<String>(
+                initialValue: _objetivoSelecionado,
+                decoration: const InputDecoration(labelText: "Objetivo"),
+                items:
+                    ["Emagrecer", "Hipertrofia", "Manter"]
+                        .map(
+                          (obj) => DropdownMenuItem(value: obj, child: Text(obj)),
+                        )
+                        .toList(),
+                onChanged:
+                    (value) => setState(() => _objetivoSelecionado = value!),
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton(
                 onPressed: () async {
                   FocusManager.instance.primaryFocus?.unfocus();
                   try {
                     configuracoesModel.alturaUsuario = double.parse(
                       alturaUsuarioController.text,
                     );
-                  } catch (e) {
-                    showDialog(
-                      context: context,
-                      builder: (context) {
-                        return AlertDialog(
-                          title: Text("Meu App"),
-                          content: Text(
-                            "Por favor informar uma altura valida em metro ex.: 1.68",
-                          ),
-                          actions: [
-                            TextButton(
-                              onPressed: () {
-                                Navigator.pop(context);
-                              },
-                              child: Text('ok'),
-                            ),
-                          ],
-                        );
-                      },
+                    configuracoesModel.pesoMeta = double.parse(
+                      pesoMetaController.text,
                     );
-                    return;
+                    configuracoesModel.nomeUsuario = nomeUsuarioController.text;
+                    configuracoesModel.objetivo = _objetivoSelecionado;
+          
+                    configuracoesRepository.salvar(configuracoesModel);
+                    Navigator.pop(context);
+                  } catch (e) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text("Erro: Verifique os números inseridos!"),
+                      ),
+                    );
                   }
-                  configuracoesModel.nomeUsuario = nomeUsuarioController.text;
-                  configuracoesRepository.salvar(configuracoesModel);
-                  Navigator.pop(context);
                 },
-                child: Text('Salvar'),
+                child: const Text('Salvar Alterações'),
               ),
             ],
           ),

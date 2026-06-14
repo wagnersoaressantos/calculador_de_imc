@@ -3,7 +3,6 @@ import 'package:calculadora_imc/model/configuracao_model.dart';
 import 'package:calculadora_imc/repository/configuracoes_repository.dart';
 import 'package:calculadora_imc/repository/pessoa_repository.dart';
 import 'package:calculadora_imc/service_locator.dart';
-import 'package:calculadora_imc/share/imagens_share.dart';
 import 'package:flutter/material.dart';
 
 class CalcularImcPage extends StatefulWidget {
@@ -22,7 +21,6 @@ class _CalcularImcPageState extends State<CalcularImcPage> {
   final TextEditingController _alturaPessoa = TextEditingController();
 
   final _repo = getIt<PessoaRepository>();
-  // NOVO: Chave global para identificar e validar o nosso Formulário
   final _formKey = GlobalKey<FormState>();
 
   String _resultado = "";
@@ -43,7 +41,6 @@ class _CalcularImcPageState extends State<CalcularImcPage> {
     });
   }
 
-  /// NOVO: Função para mostrar um SnackBar elegante e flutuante
   void _mostrarSnackBar(String mensagem, Color cor, IconData icone) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -60,13 +57,9 @@ class _CalcularImcPageState extends State<CalcularImcPage> {
           ],
         ),
         backgroundColor: cor,
-        behavior: SnackBarBehavior.floating, // Faz o SnackBar flutuar
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10), // Bordas arredondadas
-        ),
-        margin: const EdgeInsets.all(
-          16,
-        ), // Margem para não ficar colado aos cantos
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        margin: const EdgeInsets.all(16),
         duration: const Duration(seconds: 3),
       ),
     );
@@ -75,172 +68,144 @@ class _CalcularImcPageState extends State<CalcularImcPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.cyan,
+      // 🔥 O fundo ciano foi removido. O Scaffold agora usa a cor de fundo do Tema (Claro ou Escuro)!
       appBar: AppBar(
         title: const Text('Calculadora de IMC'),
         centerTitle: true,
       ),
-      body: SingleChildScrollView(
-        child: Container(
-          padding: const EdgeInsets.all(16),
-          color: Colors.cyan,
-          // NOVO: Envolvemos a Column com o Form e passamos a _formKey
-          child: Form(
-            key: _formKey,
-            child: Center(
+      body: SafeArea(
+        child: SingleChildScrollView(
+          child: Padding(
+            // 🔥 2. Dar um pouco mais de "respiro" no fundo (bottom: 40) para o botão não ficar colado à base
+            padding: const EdgeInsets.only(
+              left: 24.0,
+              right: 24.0,
+              top: 24.0,
+              bottom: 40.0,
+            ),
+            child: Form(
+              key: _formKey,
               child: Column(
+                crossAxisAlignment:
+                    CrossAxisAlignment.stretch, // Estica os botões
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        style: BorderStyle.solid,
-                        width: 2,
-                        color: Colors.black,
-                      ),
-                    ),
-                    child: Image.asset(ImagensShare.imc, height: 75, width: 75),
+                  // 🔥 O nosso "Logo" dinâmico usando ícone
+                  Icon(
+                    Icons.calculate,
+                    size: 100,
+                    color:
+                        Theme.of(
+                          context,
+                        ).colorScheme.primary, // Usa a cor principal do tema
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 30),
 
-                  // Campo NOME
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        style: BorderStyle.solid,
-                        width: 2,
-                        color: Colors.black,
-                      ),
+                  // 🔥 Campo NOME super limpo (o tema trata das bordas)
+                  TextFormField(
+                    controller: _nomePessoa,
+                    decoration: const InputDecoration(
+                      labelText: 'Nome',
+                      prefixIcon: Icon(
+                        Icons.person,
+                      ), // Um ícone elegante dentro do campo
                     ),
-                    // Trocamos TextField por TextFormField
-                    child: TextFormField(
-                      controller: _nomePessoa,
-                      decoration: const InputDecoration(hintText: 'Nome'),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Por favor, insira um nome'; // Mensagem de erro em vermelho
-                        }
-                        return null; // Null significa que está tudo OK
-                      },
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-
-                  // Campo PESO
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        style: BorderStyle.solid,
-                        width: 2,
-                        color: Colors.black,
-                      ),
-                    ),
-                    child: TextFormField(
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      controller: _pesoPessoa,
-                      decoration: const InputDecoration(
-                        hintText: 'Peso (ex: 75.5)',
-                      ),
-                      validator: (value) {
-                        if (value == null || value.isEmpty)
-                          return 'Insira o peso';
-                        // Substitui vírgula por ponto para evitar erros de conversão
-                        if (double.tryParse(value.replaceAll(',', '.')) ==
-                            null) {
-                          return 'Valor inválido';
-                        }
-                        return null;
-                      },
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-
-                  // Campo ALTURA
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        style: BorderStyle.solid,
-                        width: 2,
-                        color: Colors.black,
-                      ),
-                    ),
-                    child: TextFormField(
-                      controller: _alturaPessoa,
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      decoration: const InputDecoration(
-                        hintText: 'Altura (m) ex 1.69',
-                      ),
-                      validator: (value) {
-                        if (value == null || value.isEmpty)
-                          return 'Insira a altura';
-                        if (double.tryParse(value.replaceAll(',', '.')) ==
-                            null) {
-                          return 'Valor inválido';
-                        }
-                        return null;
-                      },
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-
-                  ElevatedButton(
-                    onPressed: () {
-                      setState(() {
-                        _alturaPessoa.text =
-                            _configuracoesModel.alturaUsuario.toString();
-                      });
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Por favor, insira um nome';
+                      }
+                      return null;
                     },
-                    child: const Text('Usar altura das configurações'),
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 16),
 
+                  // 🔥 Campo PESO
+                  TextFormField(
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    controller: _pesoPessoa,
+                    decoration: const InputDecoration(
+                      labelText: 'Peso (ex: 75.5 kg)',
+                      prefixIcon: Icon(Icons.monitor_weight),
+                    ),
+                    validator: (value) {
+                      if (value == null || value.isEmpty)
+                        return 'Insira o peso';
+                      if (double.tryParse(value.replaceAll(',', '.')) == null) {
+                        return 'Valor inválido';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 16),
+
+                  // 🔥 Campo ALTURA
+                  TextFormField(
+                    controller: _alturaPessoa,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    decoration: const InputDecoration(
+                      labelText: 'Altura (ex: 1.69 m)',
+                      prefixIcon: Icon(Icons.height),
+                    ),
+                    validator: (value) {
+                      if (value == null || value.isEmpty)
+                        return 'Insira a altura';
+                      if (double.tryParse(value.replaceAll(',', '.')) == null) {
+                        return 'Valor inválido';
+                      }
+                      return null;
+                    },
+                  ),
+
+                  // Botão subtil em formato de texto para puxar a altura
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton.icon(
+                      icon: const Icon(Icons.settings, size: 16),
+                      label: const Text('Usar altura do perfil'),
+                      onPressed: () {
+                        setState(() {
+                          _alturaPessoa.text =
+                              _configuracoesModel.alturaUsuario.toString();
+                        });
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // 🔥 CARTÃO DE RESULTADO DINÂMICO
                   if (_exibirResultado)
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          style: BorderStyle.solid,
-                          width: 2,
-                          color: Colors.black,
-                        ),
-                      ),
-                      child: Text(
-                        _resultado,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
+                    Card(
+                      color:
+                          Theme.of(context)
+                              .colorScheme
+                              .primaryContainer, // Azul claro ou azul escuro, consoante o tema
+                      margin: const EdgeInsets.only(bottom: 20),
+                      child: Padding(
+                        padding: const EdgeInsets.all(20),
+                        child: Text(
+                          _resultado,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color:
+                                Theme.of(context)
+                                    .colorScheme
+                                    .onPrimaryContainer, // Texto adaptável ao fundo!
+                          ),
                         ),
                       ),
                     ),
-                  const SizedBox(height: 10),
 
-                  // Botão CALCULAR
+                  // 🔥 Botão CALCULAR
                   ElevatedButton.icon(
-                    label: const Text("Calcular"),
+                    icon: const Icon(Icons.check),
+                    label: const Text("Calcular e Guardar"),
                     onPressed: () {
-                      // NOVO: Antes de fazer qualquer cálculo, verificamos se o Form é válido
                       if (_formKey.currentState!.validate()) {
-                        // Agora é seguro usar o force unwrap (!) porque o validator já garantiu que é um número válido
-                        // O replaceAll garante que se o utilizador digitar "70,5" o Dart entende como "70.5"
-                        // 1. Pegamos os valores e tratamos a vírgula (que você já tem)
                         double peso = double.parse(
                           _pesoPessoa.text.replaceAll(',', '.'),
                         );
@@ -248,13 +213,8 @@ class _CalcularImcPageState extends State<CalcularImcPage> {
                           _alturaPessoa.text.replaceAll(',', '.'),
                         );
 
-                        // NOVO: 2. Tratamento inteligente para altura em centímetros
-                        // Se a altura for maior que 3 (ex: 169, 175, 180), assumimos que está em centímetros!
-                        if (altura > 3.0) {
-                          altura = altura / 100; // Converte 169 para 1.69
-                        }
+                        if (altura > 3.0) altura = altura / 100;
 
-                        // 3. Verificamos o zero (que você já tem)
                         if (peso == 0 || altura == 0) {
                           _mostrarSnackBar(
                             'Peso e altura não podem ser 0!',
@@ -263,6 +223,7 @@ class _CalcularImcPageState extends State<CalcularImcPage> {
                           );
                           return;
                         }
+
                         setState(() {
                           _resultado = CalculadorDeImc.calculadorDeImc(
                             peso,
@@ -276,17 +237,13 @@ class _CalcularImcPageState extends State<CalcularImcPage> {
                           _exibirResultado = true;
                         });
 
-                        // Chamamos o nosso novo SnackBar de Sucesso!
                         _mostrarSnackBar(
                           'Registo salvo com sucesso!',
                           Colors.green,
                           Icons.check_circle,
                         );
-
-                        // Opcional: Esconder o teclado do ecrã após calcular
                         FocusScope.of(context).unfocus();
                       } else {
-                        // Se falhou a validação, avisamos o utilizador
                         _mostrarSnackBar(
                           'Por favor, corrija os erros nos campos.',
                           Colors.redAccent,
@@ -295,19 +252,26 @@ class _CalcularImcPageState extends State<CalcularImcPage> {
                       }
                     },
                     style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(
-                        vertical: 14,
-                        horizontal: 20,
-                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      backgroundColor:
+                          Theme.of(
+                            context,
+                          ).colorScheme.primary, // Cor do botão do tema
+                      foregroundColor:
+                          Theme.of(
+                            context,
+                          ).colorScheme.onPrimary, // Cor do texto do botão
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
                   ),
-                  const SizedBox(height: 2),
+                  const SizedBox(height: 10),
 
+                  // Botão NOVO CÁLCULO
                   if (_exibirResultado)
-                    ElevatedButton(
+                    OutlinedButton.icon(
+                      icon: const Icon(Icons.refresh),
                       onPressed: () {
                         setState(() {
                           _resultado = "";
@@ -317,7 +281,13 @@ class _CalcularImcPageState extends State<CalcularImcPage> {
                           _nomePessoa.text = "";
                         });
                       },
-                      child: const Text('Novo Calculo'),
+                      label: const Text('Novo Calculo'),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
                     ),
                 ],
               ),

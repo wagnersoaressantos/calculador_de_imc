@@ -1,6 +1,6 @@
 {
-    "name": "tela_calculadora_imc",
-    "short_name": "tela_calculadora_imc",
+    "name": "IMC+",
+    "short_name": "IMC+",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

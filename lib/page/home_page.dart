@@ -1,13 +1,10 @@
-import 'package:calculadora_imc/page/atividade_page.dart';
 import 'package:calculadora_imc/page/calcular_imc_page.dart';
 import 'package:calculadora_imc/page/historico_atividade_page.dart';
 import 'package:calculadora_imc/page/historico_imc_page.dart';
-import 'package:calculadora_imc/page/dashboard_page.dart'; // NOVO: Importamos o seu Dashboard
-import 'package:calculadora_imc/share/imagens_share.dart';
+import 'package:calculadora_imc/page/dashboard_page.dart';
 import 'package:calculadora_imc/share/widget/custon_drawer.dart';
 import 'package:flutter/material.dart';
 
-// NOVOS IMPORTS para Inteligência e Dados
 import 'package:calculadora_imc/model/pessoa_model.dart';
 import 'package:calculadora_imc/repository/pessoa_repository.dart';
 import 'package:calculadora_imc/service_locator.dart';
@@ -21,7 +18,6 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  // 1. Chamamos a nossa Caixa de Ferramentas
   final _repo = getIt<PessoaRepository>();
   PessoaModel? _usuarioPrincipal;
 
@@ -31,18 +27,15 @@ class _HomePageState extends State<HomePage> {
     _carregarDados();
   }
 
-  // 2. Função para buscar os dados e descobrir quem é o usuário principal
   void _carregarDados() {
     final pessoas = _repo.listarPessoas();
     setState(() {
       if (pessoas.isNotEmpty) {
-        // Para simplificar, pegamos a primeira pessoa cadastrada para o resumo
         _usuarioPrincipal = pessoas.first;
       }
     });
   }
 
-  // 3. O CÉREBRO DA TELA: O Widget do Resumo Rápido
   Widget _construirPainelResumo() {
     if (_usuarioPrincipal == null) {
       return const Center(
@@ -54,7 +47,6 @@ class _HomePageState extends State<HomePage> {
       );
     }
 
-    // Extrair dados com segurança
     final pessoa = _usuarioPrincipal!;
     double ultimoImc = 0.0;
     String classificacao = "Sem dados";
@@ -69,10 +61,9 @@ class _HomePageState extends State<HomePage> {
       caloriasTotais += atividade.caloriasGastas ?? 0.0;
     }
 
-    // Desenhar o Cartão de Saudação
     return Card(
       elevation: 4,
-      color: Colors.white,
+      // 🔥 CORREÇÃO: Removemos o 'color: Colors.white'. O Flutter agora escolhe a cor do cartão baseado no Tema (Claro/Escuro)
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(
         padding: const EdgeInsets.all(20.0),
@@ -130,181 +121,247 @@ class _HomePageState extends State<HomePage> {
     return SafeArea(
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Saúde & IMC'), // Um nome mais envolvente!
+          title: const Text('Saúde & IMC'),
           centerTitle: true,
           elevation: 0,
         ),
         drawer: const CustonDrawer(),
-        body: Container(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            children: [
-              SizedBox(
-                width: double.infinity,
-                child: Wrap(
-                  alignment: WrapAlignment.center,
-                  spacing: 16.0,
-                  runSpacing: 16.0,
-                  children: [
-                    // 1º Cartão: Calculadora
-                    SizedBox(
-                      width: 100,
-                      height: 120,
-                      child: GestureDetector(
-                        // O 'await' faz a tela recarregar sozinha quando voltar!
-                        onTap: () async {
-                          await Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const CalcularImcPage(),
-                            ),
-                          );
-                          _carregarDados();
-                        },
-                        child: Card(
-                          child: Container(
-                            padding: const EdgeInsets.all(8),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Expanded(child: Image.asset(ImagensShare.imc)),
-                                const SizedBox(height: 8),
-                                const Text(
-                                  'Calculadora',
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(fontSize: 11),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-
-                    // 2º Cartão: Lista de IMC
-                    SizedBox(
-                      width: 100,
-                      height: 120,
-                      child: GestureDetector(
-                        onTap: () async {
-                          await Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const HistoricoImcPage(),
-                            ),
-                          );
-                          _carregarDados();
-                        },
-                        child: Card(
-                          child: Container(
-                            padding: const EdgeInsets.all(8),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Expanded(child: Image.asset(ImagensShare.imc)),
-                                const SizedBox(height: 8),
-                                const Text(
-                                  'Lista de IMC',
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(fontSize: 11),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-
-                    // 3º Cartão: Atividades
-                    SizedBox(
-                      width: 100,
-                      height: 120,
-                      child: GestureDetector(
-                        onTap: () async {
-                          await Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder:
-                                  (context) => const HistoricoAtividadePage(),
-                            ),
-                          );
-                          _carregarDados();
-                        },
-                        child: Card(
-                          child: Container(
-                            padding: const EdgeInsets.all(8),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Expanded(child: Image.asset(ImagensShare.imc)),
-                                const SizedBox(height: 8),
-                                const Text(
-                                  'Atividades',
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(fontSize: 11),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-
-                    // 🔥 4º Cartão: Dashboard
-                    SizedBox(
-                      width: 100,
-                      height: 120,
-                      child: GestureDetector(
-                        onTap: () async {
-                          await Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const DashboardPage(),
-                            ),
-                          );
-                          _carregarDados();
-                        },
-                        child: Card(
-                          color:
-                              Colors
-                                  .blue[50], // Uma corzinha de fundo para destacar!
-                          child: Container(
-                            padding: const EdgeInsets.all(8),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const Expanded(
-                                  child: Icon(
-                                    Icons.analytics,
-                                    size: 40,
-                                    color: Colors.blue,
+        body: SafeArea(
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                SizedBox(
+                  width: double.infinity,
+                  child: Wrap(
+                    alignment: WrapAlignment.center,
+                    spacing: 16.0,
+                    runSpacing: 16.0,
+                    children: [
+                      SizedBox(
+                        width: double.infinity,
+                        child: Wrap(
+                          alignment: WrapAlignment.center,
+                          spacing: 16.0,
+                          runSpacing: 16.0,
+                          children: [
+                            // 1º Cartão: Calculadora
+                            SizedBox(
+                              width: 100,
+                              height: 120,
+                              child: GestureDetector(
+                                onTap: () async {
+                                  await Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder:
+                                          (context) => const CalcularImcPage(),
+                                    ),
+                                  );
+                                  _carregarDados();
+                                },
+                                child: Card(
+                                  child: Container(
+                                    padding: const EdgeInsets.all(8),
+                                    child: Column(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        // 🔥 Mudámos de Image.asset para Icon
+                                        Expanded(
+                                          child: Icon(
+                                            Icons.calculate,
+                                            size: 40,
+                                            color:
+                                                Theme.of(
+                                                  context,
+                                                ).colorScheme.primary,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 8),
+                                        const Text(
+                                          'Calculadora',
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ),
-                                const SizedBox(height: 8),
-                                const Text(
-                                  'Dashboard',
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold,
+                              ),
+                            ),
+
+                            // 2º Cartão: Lista de IMC
+                            SizedBox(
+                              width: 100,
+                              height: 120,
+                              child: GestureDetector(
+                                onTap: () async {
+                                  await Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder:
+                                          (context) => const HistoricoImcPage(),
+                                    ),
+                                  );
+                                  _carregarDados();
+                                },
+                                child: Card(
+                                  child: Container(
+                                    padding: const EdgeInsets.all(8),
+                                    child: Column(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        // 🔥 Ícone de Histórico / Lista
+                                        Expanded(
+                                          child: Icon(
+                                            Icons.history,
+                                            size: 40,
+                                            color:
+                                                Theme.of(
+                                                  context,
+                                                ).colorScheme.primary,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 8),
+                                        const Text(
+                                          'Lista de IMC',
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ),
-                              ],
+                              ),
                             ),
-                          ),
+
+                            // 3º Cartão: Atividades
+                            SizedBox(
+                              width: 100,
+                              height: 120,
+                              child: GestureDetector(
+                                onTap: () async {
+                                  await Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder:
+                                          (context) =>
+                                              const HistoricoAtividadePage(),
+                                    ),
+                                  );
+                                  _carregarDados();
+                                },
+                                child: Card(
+                                  child: Container(
+                                    padding: const EdgeInsets.all(8),
+                                    child: Column(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        // 🔥 Ícone de Corrida / Fitness
+                                        Expanded(
+                                          child: Icon(
+                                            Icons.directions_run,
+                                            size: 40,
+                                            color:
+                                                Theme.of(
+                                                  context,
+                                                ).colorScheme.primary,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 8),
+                                        const Text(
+                                          'Atividades',
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+
+                            // 4º Cartão: Dashboard (Já estava perfeito!)
+                            SizedBox(
+                              width: 100,
+                              height: 120,
+                              child: GestureDetector(
+                                onTap: () async {
+                                  await Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder:
+                                          (context) => const DashboardPage(),
+                                    ),
+                                  );
+                                  _carregarDados();
+                                },
+                                child: Card(
+                                  color:
+                                      Theme.of(
+                                        context,
+                                      ).colorScheme.primaryContainer,
+                                  child: Container(
+                                    padding: const EdgeInsets.all(8),
+                                    child: Column(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        Expanded(
+                                          child: Icon(
+                                            Icons.analytics,
+                                            size: 40,
+                                            color:
+                                                Theme.of(context)
+                                                    .colorScheme
+                                                    .onPrimaryContainer,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 8),
+                                        Text(
+                                          'Dashboard',
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.bold,
+                                            color:
+                                                Theme.of(context)
+                                                    .colorScheme
+                                                    .onPrimaryContainer,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
 
-              const SizedBox(height: 30), // Espaço de respiro
-              // O NOSSO NOVO PAINEL DE RESUMO ENTRA AQUI, PREENCHENDO O RESTO DA TELA!
-              Expanded(
-                child: SingleChildScrollView(child: _construirPainelResumo()),
-              ),
-            ],
+                const SizedBox(height: 30),
+
+                Expanded(
+                  child: SingleChildScrollView(child: _construirPainelResumo()),
+                ),
+              ],
+            ),
           ),
         ),
       ),
