@@ -44,13 +44,23 @@ class CalculadorDeImc {
 
   // Colocamos "static" aqui também
   static String classificacaoIMC(double imc) {
-    if (imc < 16) return "Magreza grave";
-    if (imc < 17) return "Magreza moderada";
-    if (imc < 18.5) return "Magreza leve";
-    if (imc < 25) return "Saudável";
-    if (imc < 30) return "Sobrepeso";
-    if (imc < 35) return "Obesidade Grau I";
-    if (imc < 40) return "Obesidade Grau II (severa)";
-    return "Obesidade Grau III (mórbida)";
+    // MELHORIA UX: Fornecer explicações e recomendações em vez de apenas a classificação crua
+    if (imc < 16) {
+      return "Magreza grave\n\nO seu peso está significativamente abaixo do ideal. Recomendamos procurar orientação médica para avaliação nutricional.";
+    } else if (imc >= 16 && imc < 17) {
+      return "Magreza moderada\n\nO seu peso está abaixo do normal. Uma dieta balanceada pode ajudar a alcançar um peso mais saudável.";
+    } else if (imc >= 17 && imc < 18.5) {
+      return "Magreza leve\n\nEstá quase no peso ideal. Continue a alimentar-se bem e a praticar exercício.";
+    } else if (imc >= 18.5 && imc < 25) {
+      return "Saudável (Peso normal)\n\nExcelente! O seu peso é considerado saudável. Mantenha os seus bons hábitos.";
+    } else if (imc >= 25 && imc < 30) {
+      return "Sobrepeso\n\nEstá um pouco acima do peso. Exercício regular e atenção à dieta podem ajudar a prevenir problemas de saúde.";
+    } else if (imc >= 30 && imc < 35) {
+      return "Obesidade Grau I\n\nAtenção. Este nível de IMC pode aumentar o risco de doenças cardiovasculares. Considere consultar um especialista.";
+    } else if (imc >= 35 && imc < 40) {
+      return "Obesidade Grau II (severa)\n\nRisco elevado para a saúde. É aconselhável procurar acompanhamento médico e nutricional para um plano adequado.";
+    } else {
+      return "Obesidade Grau III (mórbida)\n\nRisco muito elevado. Por favor, procure orientação médica o quanto antes para cuidar da sua saúde.";
+    }
   }
 }

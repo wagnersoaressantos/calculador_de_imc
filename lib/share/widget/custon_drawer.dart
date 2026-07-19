@@ -103,20 +103,6 @@ class _CustonDrawerState extends State<CustonDrawer> {
             },
           ),
           const Divider(),
-
-          ListTile(
-            leading: const Icon(Icons.analytics),
-            title: const Text('Dashboard'),
-            trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-            onTap: () {
-              Navigator.pop(context);
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const DashboardPage()),
-              );
-            },
-          ),
-          const Divider(),
         ],
       ),
     );
