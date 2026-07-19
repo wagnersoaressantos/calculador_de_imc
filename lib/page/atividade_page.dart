@@ -11,6 +11,10 @@ class AtividadePage extends StatefulWidget {
 }
 
 class _AtividadePageState extends State<AtividadePage> {
+  // 1. TRATAMENTO DE STRINGS (.trim)
+  // O método .trim() remove espaços em branco indesejados que o usuário pode ter
+  // digitado acidentalmente no início ou no fim do texto.
+  // Exemplo: " Corrida " se transforma em "Corrida".
   final TextEditingController _nomeController = TextEditingController();
   final TextEditingController _duracaoController = TextEditingController();
 
@@ -106,32 +110,38 @@ class _AtividadePageState extends State<AtividadePage> {
                 items:
                     ["Leve", "Moderada", "Alta"]
                         .map(
-                          (nivel) =>
-                              DropdownMenuItem(value: nivel, child: Text(nivel)),
+                          (nivel) => DropdownMenuItem(
+                            value: nivel,
+                            child: Text(nivel),
+                          ),
                         )
                         .toList(),
                 onChanged:
                     (value) => setState(() => _intensidadeSelecionada = value!),
               ),
               const SizedBox(height: 20),
-        
-              // 🔥 BOTÃO DE SALVAR REFORMULADO
+
+              // BOTÃO DE SALVAR REFORMULADO
               ElevatedButton(
                 onPressed: () {
-                  if (_nomeController.text.isEmpty ||
-                      _duracaoController.text.isEmpty) {
+                  // 1. TRATAMENTO DE STRINGS (.trim)
+                  // Remove espaços em branco do início e do final para não sujar o banco de dados.
+                  final nomeTexto = _nomeController.text.trim();
+                  final duracaoTexto = _duracaoController.text.trim();
+
+                  // 2. VALIDAÇÃO DE CAMPOS VAZIOS APÓS A LIMPEZA
+                  if (nomeTexto.isEmpty || duracaoTexto.isEmpty) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text("Preencha todos os campos!")),
+                      const SnackBar(
+                        content: Text("Preencha todos os campos!"),
+                      ),
                     );
                     return;
                   }
-        
-                  final duracao = int.tryParse(_duracaoController.text) ?? 0;
-                  final pessoa = _repo.obterOuCriarPessoa(
-                    _nomeController.text,
-                    0,
-                  );
-        
+
+                  final duracao = int.tryParse(duracaoTexto) ?? 0;
+                  final pessoa = _repo.obterOuCriarPessoa(nomeTexto, 0);
+
                   if (pessoa != null) {
                     // 1. Inteligência: Buscar o último peso da pessoa
                     double pesoAtual =
@@ -140,7 +150,7 @@ class _AtividadePageState extends State<AtividadePage> {
                       // Pega o peso do último registro de IMC feito na outra tela!
                       pesoAtual = pessoa.registros.last.peso;
                     }
-        
+
                     // 2. Calcula as calorias com base no peso real
                     double calorias = _calcularCalorias(
                       _tipoSelecionado,
@@ -148,7 +158,7 @@ class _AtividadePageState extends State<AtividadePage> {
                       duracao,
                       pesoAtual,
                     );
-        
+
                     // 3. Cria a atividade incluindo as calorias
                     final atividade = AtividadeModel(
                       tipo: _tipoSelecionado,
@@ -157,10 +167,10 @@ class _AtividadePageState extends State<AtividadePage> {
                       data: DateTime.now(),
                       caloriasGastas: calorias,
                     );
-        
+
                     pessoa.atividades.add(atividade);
                     pessoa.save();
-        
+
                     // 4. Mostra o Feedback super interativo e encorajador
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
@@ -168,16 +178,19 @@ class _AtividadePageState extends State<AtividadePage> {
                           "🔥 Sucesso! Você queimou cerca de ${calorias.toStringAsFixed(0)} kcal.",
                         ),
                         backgroundColor:
-                            Colors.orange, // Laranja combinando com fogo/calorias
+                            Colors
+                                .orange, // Laranja combinando com fogo/calorias
                         behavior: SnackBarBehavior.floating,
                       ),
                     );
                   } else {
                     debugPrint("Erro: Pessoa retornou nula.");
                   }
-        
+                  // 🔥 3. LIMPEZA AUTOMÁTICA DOS CAMPOS
+                  // Fecha o teclado e limpa os inputs para a próxima atividade
                   _nomeController.clear();
                   _duracaoController.clear();
+                  FocusScope.of(context).unfocus();
                 },
                 child: const Text("Salvar Atividade"),
               ),

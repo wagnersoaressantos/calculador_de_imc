@@ -206,11 +206,15 @@ class _CalcularImcPageState extends State<CalcularImcPage> {
                     label: const Text("Calcular e Guardar"),
                     onPressed: () {
                       if (_formKey.currentState!.validate()) {
+                        // 1. TRATAMENTO DE STRINGS E VÍRGULAS
+                        // O .replaceAll(',', '.') garante que a vírgula vire ponto,
+                        // pois a linguagem Dart só faz contas com ponto decimal.
+                        // O .trim() remove os espaços invisíveis no início ou fim.
                         double peso = double.parse(
-                          _pesoPessoa.text.replaceAll(',', '.'),
+                          _pesoPessoa.text.replaceAll(',', '.').trim(),
                         );
                         double altura = double.parse(
-                          _alturaPessoa.text.replaceAll(',', '.'),
+                          _alturaPessoa.text.replaceAll(',', '.').trim(),
                         );
 
                         if (altura > 3.0) altura = altura / 100;
@@ -218,6 +222,25 @@ class _CalcularImcPageState extends State<CalcularImcPage> {
                         if (peso == 0 || altura == 0) {
                           _mostrarSnackBar(
                             'Peso e altura não podem ser 0!',
+                            Colors.orange,
+                            Icons.warning,
+                          );
+                          return;
+                        }
+                        // 2. PREVENÇÃO DE ERROS: DADOS IRREAIS
+                        // Bloqueia se o usuário digitar dados absurdos por engano.
+                        // Ajustado para permitir bebês: peso mínimo 1kg e altura mínima 0.25m (25cm).
+                        if (peso < 1.0 || peso > 500.0) {
+                          _mostrarSnackBar(
+                            'Insira um peso realista (entre 1kg e 500kg).',
+                            Colors.orange,
+                            Icons.warning,
+                          );
+                          return;
+                        }
+                        if (altura < 0.25 || altura > 3.0) {
+                          _mostrarSnackBar(
+                            'Insira uma altura realista (entre 0.25m e 3.0m).',
                             Colors.orange,
                             Icons.warning,
                           );
@@ -242,6 +265,11 @@ class _CalcularImcPageState extends State<CalcularImcPage> {
                           Colors.green,
                           Icons.check_circle,
                         );
+
+                        // 3. LIMPEZA DOS CAMPOS
+                        // Limpamos o peso automaticamente para facilitar um novo cadastro,
+                        // e tiramos o foco para fechar o teclado do celular.
+                        _pesoPessoa.clear();
                         FocusScope.of(context).unfocus();
                       } else {
                         _mostrarSnackBar(

@@ -1,11 +1,12 @@
 import 'package:calculadora_imc/calcularIMC/calculador_de_imc.dart';
 import 'package:calculadora_imc/model/pessoa_model.dart';
-import 'package:calculadora_imc/model/registro_imc_model.dart'; // Adicionado para aceder ao modelo
+import 'package:calculadora_imc/model/registro_imc_model.dart';
 import 'package:calculadora_imc/page/calcular_imc_page.dart';
 import 'package:calculadora_imc/repository/pessoa_repository.dart';
 import 'package:calculadora_imc/service_locator.dart';
 import 'package:flutter/material.dart';
-import 'package:fl_chart/fl_chart.dart'; // Importante: O pacote do gráfico
+import 'package:fl_chart/fl_chart.dart';
+import 'dart:math';
 
 class HistoricoImcPage extends StatefulWidget {
   const HistoricoImcPage({super.key});
@@ -18,6 +19,8 @@ class _HistoricoImcPageState extends State<HistoricoImcPage> {
   final _repo = getIt<PessoaRepository>();
   List<PessoaModel> _listaPessoas = [];
 
+  final _random = Random();
+
   @override
   void initState() {
     super.initState();
@@ -28,65 +31,138 @@ class _HistoricoImcPageState extends State<HistoricoImcPage> {
     _listaPessoas = _repo.listarPessoas();
   }
 
-  /// NOVO MÉTODO: Cria o widget do gráfico de linha
-  /// Recebe a lista de registos de uma pessoa e desenha a evolução do IMC.
+  Color _corParaNivelIMC(String classificacao) {
+    if (classificacao.contains("Abaixo do peso") ||
+        classificacao.contains("Magreza"))
+      return Colors.blue;
+    if (classificacao.contains("Saudável") ||
+        classificacao.contains("Peso normal"))
+      return Colors.green;
+    if (classificacao.contains("Sobrepeso")) return Colors.orange;
+    if (classificacao.contains("Obesidade Grau I")) return Colors.deepOrange;
+    return Colors.red;
+  }
+
   Widget _construirGraficoEvolucao(List<RegistroImcModel> registros) {
-    // Se tiver menos de 2 registos, não desenhamos a linha, pois precisamos
-    // de pelo menos dois pontos para conectar.
     if (registros.length < 2) {
       return const Padding(
         padding: EdgeInsets.all(16.0),
         child: Text(
-          "Adiciona mais medições para veres o gráfico de evolução do IMC.",
+          "Adicione mais medições para ver o gráfico de evolução.",
           style: TextStyle(fontStyle: FontStyle.italic, color: Colors.grey),
           textAlign: TextAlign.center,
         ),
       );
     }
+    // 1. Obter todos os valores de IMC para encontrar o mínimo e o máximo
+    List<double> valoresImc = registros.map((r) => r.imc).toList();
+    double minImc = valoresImc.reduce(min);
+    double maxImc = valoresImc.reduce(max);
 
-    // Convertendo a lista de registos em pontos (FlSpot) para o fl_chart
+    // 2. Dar uma folga de 2 pontos (ou pelo menos 1 se a variação for mínima)
+    // para que a linha nunca toque no teto ou no chão do gráfico
+    double minY = (minImc - 2.0).floorToDouble();
+    double maxY = (maxImc + 2.0).ceilToDouble();
+
+    // Se a variação entre o mínimo e o máximo for muito pequena (ex: 24.8 a 25.5),
+    // o intervalo de 2.0 que definimos pode ser muito grande.
+    // Vamos calcular um intervalo mais inteligente.
+    double intervalo = (maxY - minY) > 10 ? 2.0 : 1.0;
+
     List<FlSpot> pontosDoGrafico =
         registros.asMap().entries.map((entry) {
-          // entry.key é o índice (0, 1, 2...) que será o nosso eixo X (tempo)
-          // entry.value é o RegistroImcModel, do qual tiramos o IMC para o eixo Y
           return FlSpot(entry.key.toDouble(), entry.value.imc);
         }).toList();
 
-    // Retorna o gráfico envolto num Container para limitar a sua altura
     return Container(
-      height: 200,
-      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 20.0),
+      height: 250, // 🔥 Aumentámos um pouco a altura para os números respirarem
+      padding: const EdgeInsets.only(
+        right: 20.0,
+        left: 10.0,
+        top: 24.0,
+        bottom: 12.0,
+      ),
       child: LineChart(
         LineChartData(
-          // Estilização básica do gráfico
-          gridData: FlGridData(show: false), // Esconde a grelha de fundo
+          // 🔥 CORREÇÃO DO TOOLTIP (Balão ao clicar)
+          minY: minY,
+          maxY: maxY,
+          lineTouchData: LineTouchData(
+            touchTooltipData: LineTouchTooltipData(
+              getTooltipColor:
+                  (LineBarSpot touchedSpot) =>
+                      Colors.blueGrey.withOpacity(0.8), // CORRIGIDO AQUI
+              getTooltipItems: (List<LineBarSpot> touchedSpots) {
+                return touchedSpots.map((spot) {
+                  // Formatamos para 1 casa decimal e adicionamos o "IMC" no balão
+                  return LineTooltipItem(
+                    "IMC: ${spot.y.toStringAsFixed(1)}",
+                    const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  );
+                }).toList();
+              },
+            ),
+          ),
+          gridData: FlGridData(
+            show: true,
+            drawVerticalLine: false, // Tira as linhas em pé
+            horizontalInterval: intervalo,
+            getDrawingHorizontalLine: (value) {
+              return FlLine(
+                color: Colors.grey.withOpacity(0.2),
+                strokeWidth: 1,
+              );
+            },
+          ),
           titlesData: FlTitlesData(
-            bottomTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-            topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-            rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+            bottomTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false),
+            ),
+            topTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false),
+            ),
+            rightTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false),
+            ),
             leftTitles: AxisTitles(
-              sideTitles: SideTitles(showTitles: true, reservedSize: 40),
+              sideTitles: SideTitles(
+                showTitles: true,
+                reservedSize:
+                    40, // 🔥 Dá espaço suficiente para o número não cortar
+                interval:
+                    2.0, // 🔥 Força a desenhar números apenas a cada 2 pontos de IMC (ex: 22, 24, 26)
+                getTitlesWidget: (value, meta) {
+                  // 🔥 Formata o número do eixo Y para não ter dezenas de casas decimais
+                  return SideTitleWidget(
+                    meta: meta, // CORRIGIDO AQUI
+                    space: 8.0,
+                    child: Text(
+                      value.toStringAsFixed(
+                        0,
+                      ), // Mostra o número inteiro no eixo
+                      style: const TextStyle(color: Colors.grey, fontSize: 12),
+                    ),
+                  );
+                },
+              ),
             ),
           ),
           borderData: FlBorderData(show: false),
           lineBarsData: [
             LineChartBarData(
-              spots: pontosDoGrafico, // Aqui passamos os nossos pontos!
-              isCurved: true, // Deixa a linha com curvas suaves
-              color:
-                  Theme.of(
-                    context,
-                  ).primaryColor, // Usa a cor principal do teu tema
-              barWidth: 4, // Espessura da linha
+              spots: pontosDoGrafico,
+              isCurved: true,
+              color: Theme.of(context).primaryColor,
+              barWidth:
+                  3, // 🔥 Linha ligeiramente mais fina para ficar elegante
               isStrokeCapRound: true,
-              dotData: FlDotData(
-                show: true,
-              ), // Mostra uma bolinha em cada medição
+              dotData: const FlDotData(show: true),
               belowBarData: BarAreaData(
                 show: true,
-                color: Theme.of(context).primaryColor.withOpacity(
-                  0.2,
-                ), // Efeito de sombra abaixo da linha
+                color: Theme.of(context).primaryColor.withOpacity(0.15),
               ),
             ),
           ],
@@ -119,13 +195,11 @@ class _HistoricoImcPageState extends State<HistoricoImcPage> {
                 itemBuilder: (_, index) {
                   final pessoa = _listaPessoas[index];
 
-                  // 1. Envolvemos o Cartão INTEIRO da pessoa num Dismissible
                   return Dismissible(
-                    // Usamos a key nativa do HiveObject para identificar a pessoa
-                    key: Key(pessoa.key.toString()),
+                    key: Key(
+                      "perfil_${pessoa.key}_${pessoa.nome}_${_random.nextInt(10000)}",
+                    ),
                     direction: DismissDirection.endToStart,
-
-                    // 2. O fundo vermelho intenso para indicar PERIGO (Excluir Tudo)
                     background: Container(
                       color: Colors.red[800],
                       alignment: Alignment.centerRight,
@@ -148,25 +222,19 @@ class _HistoricoImcPageState extends State<HistoricoImcPage> {
                         ],
                       ),
                     ),
-
-                    // 3. O TRAVÃO DE SEGURANÇA: Confirmação antes de apagar
                     confirmDismiss: (direction) async {
-                      // Retorna um showDialog que devolve true (apaga) ou false (cancela)
                       return await showDialog(
                         context: context,
                         builder: (BuildContext context) {
                           return AlertDialog(
                             title: const Text("Excluir Utilizador?"),
                             content: Text(
-                              "Tem a certeza que deseja apagar '${pessoa.nome}'?\n\n"
-                              "⚠️ Todo o histórico de IMC e Atividades será perdido para sempre.",
+                              "Tem certeza que deseja apagar '${pessoa.nome}'?\n\n⚠️ Todo o histórico será perdido.",
                             ),
                             actions: [
                               TextButton(
                                 onPressed:
-                                    () => Navigator.of(
-                                      context,
-                                    ).pop(false), // Cancela
+                                    () => Navigator.of(context).pop(false),
                                 child: const Text("Cancelar"),
                               ),
                               ElevatedButton(
@@ -174,9 +242,7 @@ class _HistoricoImcPageState extends State<HistoricoImcPage> {
                                   backgroundColor: Colors.red,
                                 ),
                                 onPressed:
-                                    () => Navigator.of(
-                                      context,
-                                    ).pop(true), // Confirma a exclusão
+                                    () => Navigator.of(context).pop(true),
                                 child: const Text(
                                   "Sim, Excluir",
                                   style: TextStyle(color: Colors.white),
@@ -187,18 +253,11 @@ class _HistoricoImcPageState extends State<HistoricoImcPage> {
                         },
                       );
                     },
-
-                    // 4. Se o utilizador clicou em "Sim, Excluir", esta função corre
                     onDismissed: (direction) {
-                      // O Hive apaga o objeto inteiro do banco de dados na hora!
                       pessoa.delete();
-
-                      // Atualizamos a lista na tela
                       setState(() {
                         _carregarDados();
                       });
-
-                      // Mostramos o aviso final
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
                           content: Text(
@@ -208,11 +267,12 @@ class _HistoricoImcPageState extends State<HistoricoImcPage> {
                         ),
                       );
                     },
-
-                    // O Card original da pessoa fica aqui dentro
                     child: Card(
                       margin: const EdgeInsets.all(8),
                       child: ExpansionTile(
+                        key: Key(
+                          "tile_${pessoa.key}_${_random.nextInt(10000)}",
+                        ),
                         title: Text(
                           pessoa.nome,
                           style: const TextStyle(
@@ -225,7 +285,7 @@ class _HistoricoImcPageState extends State<HistoricoImcPage> {
                                 ? [
                                   const Padding(
                                     padding: EdgeInsets.all(8.0),
-                                    child: Text("Nenhum registo ainda."),
+                                    child: Text("Nenhum registro ainda."),
                                   ),
                                 ]
                                 : [
@@ -240,18 +300,20 @@ class _HistoricoImcPageState extends State<HistoricoImcPage> {
                                       ),
                                     ),
                                   ),
-
-                                  // AQUI É O CÓDIGO ANTIGO DO DISMISSIBLE DE CADA IMC INDIVIDUAL (Que já fizemos)
                                   ...pessoa.registros.asMap().entries.map((
                                     entry,
                                   ) {
                                     int indexReg = entry.key;
                                     var registro = entry.value;
 
+                                    String classificacao =
+                                        CalculadorDeImc.classificacaoIMC(
+                                          registro.imc,
+                                        );
+
                                     return Dismissible(
                                       key: Key(
-                                        registro.data.toString() +
-                                            indexReg.toString(),
+                                        "imc_${pessoa.key}_${registro.data.millisecondsSinceEpoch}_${_random.nextInt(10000)}",
                                       ),
                                       direction: DismissDirection.endToStart,
                                       background: Container(
@@ -274,23 +336,42 @@ class _HistoricoImcPageState extends State<HistoricoImcPage> {
                                           context,
                                         ).showSnackBar(
                                           const SnackBar(
-                                            content: Text("Registo apagado!"),
+                                            content: Text("Registro apagado!"),
                                             backgroundColor: Colors.redAccent,
                                             behavior: SnackBarBehavior.floating,
                                           ),
                                         );
                                       },
-                                      child: ListTile(
-                                        leading: const Icon(
-                                          Icons.monitor_weight,
+                                      child: Container(
+                                        decoration: BoxDecoration(
+                                          border: Border(
+                                            left: BorderSide(
+                                              color: _corParaNivelIMC(
+                                                classificacao,
+                                              ),
+                                              width: 6,
+                                            ),
+                                          ),
                                         ),
-                                        title: Text(
-                                          "IMC: ${registro.imc.toStringAsFixed(2)}",
-                                        ),
-                                        subtitle: Text(
-                                          "Peso: ${registro.peso} kg\n"
-                                          "Classificação: ${CalculadorDeImc.classificacaoIMC(registro.imc)} \n"
-                                          "Data: ${registro.data.day}/${registro.data.month}/${registro.data.year}",
+                                        child: ListTile(
+                                          leading: Icon(
+                                            Icons.monitor_weight,
+                                            color: _corParaNivelIMC(
+                                              classificacao,
+                                            ),
+                                          ),
+                                          title: Text(
+                                            "IMC: ${registro.imc.toStringAsFixed(2)}",
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                          subtitle: Text(
+                                            "Peso: ${registro.peso} kg\n"
+                                            "Altura: ${registro.altura} m\n"
+                                            "Classificação: $classificacao\n"
+                                            "Data: ${registro.data.day.toString().padLeft(2, '0')}/${registro.data.month.toString().padLeft(2, '0')}/${registro.data.year}",
+                                          ),
                                         ),
                                       ),
                                     );
