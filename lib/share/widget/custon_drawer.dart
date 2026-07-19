@@ -49,33 +49,17 @@ class _CustonDrawerState extends State<CustonDrawer> {
             decoration: BoxDecoration(
               color: Theme.of(context).colorScheme.primary,
             ),
-            currentAccountPicture: GestureDetector(
-              onTap: () {
-                showModalBottomSheet(
-                  context: context,
-                  builder: (context) {
-                    return Wrap(
-                      children: [
-                        ListTile(
-                          leading: const Icon(Icons.camera_alt),
-                          title: const Text("Câmera"),
-                          onTap: () => Navigator.pop(context),
-                        ),
-                        ListTile(
-                          leading: const Icon(Icons.photo),
-                          title: const Text("Galeria"),
-                          onTap: () => Navigator.pop(context),
-                        ),
-                      ],
-                    );
-                  },
-                );
-              },
-              child: CircleAvatar(
-                backgroundColor: Theme.of(context).colorScheme.onPrimary,
-                child: Icon(
-                  Icons.person,
-                  size: 40,
+            // 🔥 REMOVIDA: A interação (GestureDetector) que mostrava opções falsas de Câmera/Galeria
+            currentAccountPicture: CircleAvatar(
+              backgroundColor: Theme.of(context).colorScheme.onPrimary,
+              child: Text(
+                // Uma pequena brincadeira UX: mostrar a inicial do nome!
+                _nomeUsuario != "Carregando..." && _nomeUsuario.isNotEmpty
+                    ? _nomeUsuario[0].toUpperCase()
+                    : "?",
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
                   color: Theme.of(context).colorScheme.primary,
                 ),
               ),
@@ -87,7 +71,23 @@ class _CustonDrawerState extends State<CustonDrawer> {
             ),
             accountEmail: Text(_alturaUsuario),
           ),
-
+          const SizedBox(height: 10),
+          ListTile(
+            // 🔥 MELHORIA UX: Renomeado de "Configurações" para refletir melhor a ação (Feedback Avaliadores)
+            leading: const Icon(Icons.person_outline),
+            title: const Text("Meu Perfil & Metas"),
+            trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+            onTap: () {
+              Navigator.pop(context); // Fechar o drawer
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const ConfiguracoesPage(),
+                ),
+              );
+            },
+          ),
+          const Divider(),
           // A OPÇÃO "DASHBOARD" FOI REMOVIDA DAQUI PARA EVITAR REDUNDÂNCIA!
           // Antes havia um ListTile para o Dashboard aqui. Foi apagado conforme
           // feedback dos avaliadores, pois o acesso já é feito pela HomePage.
