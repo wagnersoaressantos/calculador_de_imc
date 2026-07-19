@@ -88,6 +88,9 @@ class _CustonDrawerState extends State<CustonDrawer> {
             accountEmail: Text(_alturaUsuario),
           ),
 
+          // A OPÇÃO "DASHBOARD" FOI REMOVIDA DAQUI PARA EVITAR REDUNDÂNCIA!
+          // Antes havia um ListTile para o Dashboard aqui. Foi apagado conforme
+          // feedback dos avaliadores, pois o acesso já é feito pela HomePage.
           ListTile(
             leading: const Icon(Icons.settings),
             title: const Text('Configurações'),
