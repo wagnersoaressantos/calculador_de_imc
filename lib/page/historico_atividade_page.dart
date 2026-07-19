@@ -31,22 +31,6 @@ class _HistoricoAtividadePageState extends State<HistoricoAtividadePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Histórico de Atividades")),
-
-      // 🔹 O Botão que leva para o Formulário de Atividades
-      floatingActionButton: FloatingActionButton(
-        child: const Icon(Icons.add),
-        onPressed: () async {
-          // Vai para a tela de registro e "espera" o usuário voltar
-          await Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const AtividadePage()),
-          );
-          // Quando o usuário voltar, recarrega a lista para mostrar a nova atividade!
-          _carregarDados();
-        },
-      ),
-
       // 🔹 A Lista de Pessoas e Atividades
       body:
           _listaPessoas.isEmpty

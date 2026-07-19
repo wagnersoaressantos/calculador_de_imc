@@ -19,7 +19,7 @@ void main() async {
   await Hive.openBox<PessoaModel>('pessoas');
 
   // NOVO: 2. Configura a nossa Injeção de Dependências ANTES de abrir a App
-  configurarInjecaoDependencias();
+  setupLocator();
 
   // 3. Roda a aplicação
   runApp(const App());

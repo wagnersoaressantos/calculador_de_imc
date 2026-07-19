@@ -1,5 +1,6 @@
 import 'package:calculadora_imc/calcularIMC/calculador_de_imc.dart';
 import 'package:calculadora_imc/model/configuracao_model.dart';
+import 'package:calculadora_imc/model/sessao_usuario.dart';
 import 'package:calculadora_imc/repository/configuracoes_repository.dart';
 import 'package:calculadora_imc/repository/pessoa_repository.dart';
 import 'package:calculadora_imc/service_locator.dart';
@@ -13,31 +14,63 @@ class CalcularImcPage extends StatefulWidget {
 }
 
 class _CalcularImcPageState extends State<CalcularImcPage> {
+  // --------------------------------------------------------
+  // DEPENDÊNCIAS E REPOSITÓRIOS
+  // --------------------------------------------------------
   late ConfiguracoesRepository _configuracoesRepository;
-  late ConfiguracoesModel _configuracoesModel;
+  ConfiguracoesModel _configuracaoModel = ConfiguracoesModel.vazio();
+  final _repo = getIt<PessoaRepository>();
+  final _sessao = getIt<SessaoUsuario>(); // O nosso gestor de sessão
 
+  // --------------------------------------------------------
+  // CONTROLADORES E ESTADO
+  // --------------------------------------------------------
+  final _formKey = GlobalKey<FormState>();
   final TextEditingController _nomePessoa = TextEditingController();
   final TextEditingController _pesoPessoa = TextEditingController();
   final TextEditingController _alturaPessoa = TextEditingController();
 
-  final _repo = getIt<PessoaRepository>();
-  final _formKey = GlobalKey<FormState>();
-
   String _resultado = "";
   bool _exibirResultado = false;
 
+  // --------------------------------------------------------
+  // CICLO DE VIDA (LIFECYCLE)
+  // --------------------------------------------------------
   @override
   void initState() {
     super.initState();
-    _carregarConfiguracoes();
+    _carregarDadosIniciais();
   }
 
-  void _carregarConfiguracoes() async {
+  @override
+  void dispose() {
+    // É boa prática libertar os controladores quando a página é destruída
+    _nomePessoa.dispose();
+    _pesoPessoa.dispose();
+    _alturaPessoa.dispose();
+    super.dispose();
+  }
+
+  // --------------------------------------------------------
+  // MÉTODOS DE LÓGICA DE NEGÓCIO
+  // --------------------------------------------------------
+  Future<void> _carregarDadosIniciais() async {
     _configuracoesRepository = await ConfiguracoesRepository.load();
-    _configuracoesModel = _configuracoesRepository.pegarDados();
+    _configuracaoModel = _configuracoesRepository.pegarDados();
 
     setState(() {
-      _nomePessoa.text = _configuracoesModel.nomeUsuario;
+      // 1. Verifica se há um perfil selecionado na Sessão
+      if (_sessao.usuarioAtivo != null) {
+        _nomePessoa.text = _sessao.usuarioAtivo!.nome;
+      } else {
+        // Se não houver sessão ativa, usa a configuração padrão global
+        _nomePessoa.text = _configuracaoModel.nomeUsuario;
+      }
+
+      // 2. Pré-preenche a altura se existir
+      if (_configuracaoModel.alturaUsuario > 0) {
+        _alturaPessoa.text = _configuracaoModel.alturaUsuario.toString();
+      }
     });
   }
 
@@ -65,260 +98,244 @@ class _CalcularImcPageState extends State<CalcularImcPage> {
     );
   }
 
+  void _calcularEGuardar() {
+    if (!_formKey.currentState!.validate()) {
+      _mostrarSnackBar(
+        'Por favor, corrija os erros nos campos.',
+        Colors.redAccent,
+        Icons.error,
+      );
+      return;
+    }
+
+    // Tratamento de Strings e conversão de vírgula para ponto
+    String pesoTexto = _pesoPessoa.text.replaceAll(',', '.').trim();
+    String alturaTexto = _alturaPessoa.text.replaceAll(',', '.').trim();
+
+    double peso = double.parse(pesoTexto);
+    double altura = double.parse(alturaTexto);
+
+    // Ajuste de escala para altura digitada em centímetros (ex: 170)
+    if (altura > 3.0) altura = altura / 100;
+
+    // Prevenção de Erros: Dados irreais
+    if (peso < 1.0 || peso > 500.0) {
+      _mostrarSnackBar(
+        'Insira um peso realista (entre 1kg e 500kg).',
+        Colors.orange,
+        Icons.warning,
+      );
+      return;
+    }
+
+    if (altura < 0.25 || altura > 3.0) {
+      _mostrarSnackBar(
+        'Insira uma altura realista (entre 0.25m e 3.0m).',
+        Colors.orange,
+        Icons.warning,
+      );
+      return;
+    }
+
+    // Calcula e Grava
+    setState(() {
+      _resultado = CalculadorDeImc.calculadorDeImc(peso, altura);
+
+      _repo.adicionarRegistro(
+        nome: _nomePessoa.text.trim(),
+        peso: peso,
+        altura: altura,
+      );
+
+      _exibirResultado = true;
+    });
+
+    _mostrarSnackBar(
+      'Registo salvo com sucesso!',
+      Colors.green,
+      Icons.check_circle,
+    );
+
+    // Limpeza de campos para UX fluida
+    _pesoPessoa.clear();
+    FocusScope.of(context).unfocus(); // Fecha o teclado
+  }
+
+  void _novoCalculo() {
+    setState(() {
+      _resultado = "";
+      _exibirResultado = false;
+      _pesoPessoa.clear();
+      // Não apagamos o nome e a altura para facilitar medições recorrentes
+    });
+  }
+
+  // --------------------------------------------------------
+  // INTERFACE DE UTILIZADOR (BUILD)
+  // --------------------------------------------------------
   @override
   Widget build(BuildContext context) {
+    // Verifica se pode voltar atrás (se foi chamada por push ou está numa aba)
+    final bool mostrarAppBar = Navigator.canPop(context);
+
     return Scaffold(
-      // 🔥 O fundo ciano foi removido. O Scaffold agora usa a cor de fundo do Tema (Claro ou Escuro)!
-      appBar: AppBar(
-        title: const Text('Calculadora de IMC'),
-        centerTitle: true,
-      ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          child: Padding(
-            // 🔥 2. Dar um pouco mais de "respiro" no fundo (bottom: 40) para o botão não ficar colado à base
-            padding: const EdgeInsets.only(
-              left: 24.0,
-              right: 24.0,
-              top: 24.0,
-              bottom: 40.0,
-            ),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                crossAxisAlignment:
-                    CrossAxisAlignment.stretch, // Estica os botões
-                children: [
-                  // 🔥 O nosso "Logo" dinâmico usando ícone
-                  Icon(
-                    Icons.calculate,
-                    size: 100,
-                    color:
-                        Theme.of(
-                          context,
-                        ).colorScheme.primary, // Usa a cor principal do tema
-                  ),
-                  const SizedBox(height: 30),
+      appBar:
+          mostrarAppBar
+              ? AppBar(title: const Text('Calculadora de IMC'))
+              : null,
+      body: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.only(
+            left: 24.0,
+            right: 24.0,
+            top: 24.0,
+            bottom: 40.0, // Respiro inferior para o botão
+          ),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Ícone ilustrativo no topo
+                Icon(
+                  Icons.calculate,
+                  size: 100,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+                const SizedBox(height: 30),
 
-                  // 🔥 Campo NOME super limpo (o tema trata das bordas)
-                  TextFormField(
-                    controller: _nomePessoa,
-                    decoration: const InputDecoration(
-                      labelText: 'Nome',
-                      prefixIcon: Icon(
-                        Icons.person,
-                      ), // Um ícone elegante dentro do campo
-                    ),
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Por favor, insira um nome';
-                      }
-                      return null;
-                    },
+                // Campo: Nome
+                TextFormField(
+                  controller: _nomePessoa,
+                  decoration: const InputDecoration(
+                    labelText: 'Nome do Perfil',
+                    prefixIcon: Icon(Icons.person),
                   ),
-                  const SizedBox(height: 16),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Por favor, insira um nome';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
 
-                  // 🔥 Campo PESO
-                  TextFormField(
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
-                    ),
-                    controller: _pesoPessoa,
-                    decoration: const InputDecoration(
-                      labelText: 'Peso (ex: 75.5 kg)',
-                      prefixIcon: Icon(Icons.monitor_weight),
-                    ),
-                    validator: (value) {
-                      if (value == null || value.isEmpty)
-                        return 'Insira o peso';
-                      if (double.tryParse(value.replaceAll(',', '.')) == null) {
-                        return 'Valor inválido';
-                      }
-                      return null;
-                    },
+                // Campo: Peso
+                TextFormField(
+                  controller: _pesoPessoa,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
                   ),
-                  const SizedBox(height: 16),
-
-                  // 🔥 Campo ALTURA
-                  TextFormField(
-                    controller: _alturaPessoa,
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
-                    ),
-                    decoration: const InputDecoration(
-                      labelText: 'Altura (ex: 1.69 m)',
-                      prefixIcon: Icon(Icons.height),
-                    ),
-                    validator: (value) {
-                      if (value == null || value.isEmpty)
-                        return 'Insira a altura';
-                      if (double.tryParse(value.replaceAll(',', '.')) == null) {
-                        return 'Valor inválido';
-                      }
-                      return null;
-                    },
+                  decoration: const InputDecoration(
+                    labelText: 'Peso (ex: 75.5 kg)',
+                    prefixIcon: Icon(Icons.monitor_weight),
                   ),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Insira o peso';
+                    }
+                    if (double.tryParse(value.replaceAll(',', '.')) == null) {
+                      return 'Valor inválido';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
 
-                  // Botão subtil em formato de texto para puxar a altura
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: TextButton.icon(
-                      icon: const Icon(Icons.settings, size: 16),
-                      label: const Text('Usar altura do perfil'),
-                      onPressed: () {
+                // Campo: Altura
+                TextFormField(
+                  controller: _alturaPessoa,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  decoration: const InputDecoration(
+                    labelText: 'Altura (ex: 1.69 m)',
+                    prefixIcon: Icon(Icons.height),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Insira a altura';
+                    }
+                    if (double.tryParse(value.replaceAll(',', '.')) == null) {
+                      return 'Valor inválido';
+                    }
+                    return null;
+                  },
+                ),
+
+                // Botão de atalho: Usar Altura do Perfil Global
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton.icon(
+                    icon: const Icon(Icons.settings_backup_restore, size: 16),
+                    label: const Text('Usar altura padrão'),
+                    onPressed: () {
+                      if (_configuracaoModel.alturaUsuario > 0) {
                         setState(() {
                           _alturaPessoa.text =
-                              _configuracoesModel.alturaUsuario.toString();
+                              _configuracaoModel.alturaUsuario.toString();
                         });
-                      },
-                    ),
+                        _mostrarSnackBar(
+                          "Altura restaurada",
+                          Colors.blue,
+                          Icons.info,
+                        );
+                      }
+                    },
                   ),
-                  const SizedBox(height: 16),
+                ),
+                const SizedBox(height: 16),
 
-                  // 🔥 CARTÃO DE RESULTADO DINÂMICO
-                  if (_exibirResultado)
-                    Card(
-                      color:
-                          Theme.of(context)
-                              .colorScheme
-                              .primaryContainer, // Azul claro ou azul escuro, consoante o tema
-                      margin: const EdgeInsets.only(bottom: 20),
-                      child: Padding(
-                        padding: const EdgeInsets.all(20),
-                        child: Text(
-                          _resultado,
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color:
-                                Theme.of(context)
-                                    .colorScheme
-                                    .onPrimaryContainer, // Texto adaptável ao fundo!
-                          ),
+                // Cartão Dinâmico de Resultados
+                if (_exibirResultado)
+                  Card(
+                    color: Theme.of(context).colorScheme.primaryContainer,
+                    margin: const EdgeInsets.only(bottom: 20),
+                    child: Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Text(
+                        _resultado,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color:
+                              Theme.of(context).colorScheme.onPrimaryContainer,
                         ),
                       ),
                     ),
+                  ),
 
-                  // 🔥 Botão CALCULAR
-                  ElevatedButton.icon(
-                    icon: const Icon(Icons.check),
-                    label: const Text("Calcular e Guardar"),
-                    onPressed: () {
-                      if (_formKey.currentState!.validate()) {
-                        // 1. TRATAMENTO DE STRINGS E VÍRGULAS
-                        // O .replaceAll(',', '.') garante que a vírgula vire ponto,
-                        // pois a linguagem Dart só faz contas com ponto decimal.
-                        // O .trim() remove os espaços invisíveis no início ou fim.
-                        double peso = double.parse(
-                          _pesoPessoa.text.replaceAll(',', '.').trim(),
-                        );
-                        double altura = double.parse(
-                          _alturaPessoa.text.replaceAll(',', '.').trim(),
-                        );
+                // Botão de Submissão Principal
+                ElevatedButton.icon(
+                  icon: const Icon(Icons.check),
+                  label: const Text("Calcular e Guardar"),
+                  onPressed: _calcularEGuardar,
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    backgroundColor: Theme.of(context).colorScheme.primary,
+                    foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
 
-                        if (altura > 3.0) altura = altura / 100;
-
-                        if (peso == 0 || altura == 0) {
-                          _mostrarSnackBar(
-                            'Peso e altura não podem ser 0!',
-                            Colors.orange,
-                            Icons.warning,
-                          );
-                          return;
-                        }
-                        // 2. PREVENÇÃO DE ERROS: DADOS IRREAIS
-                        // Bloqueia se o usuário digitar dados absurdos por engano.
-                        // Ajustado para permitir bebês: peso mínimo 1kg e altura mínima 0.25m (25cm).
-                        if (peso < 1.0 || peso > 500.0) {
-                          _mostrarSnackBar(
-                            'Insira um peso realista (entre 1kg e 500kg).',
-                            Colors.orange,
-                            Icons.warning,
-                          );
-                          return;
-                        }
-                        if (altura < 0.25 || altura > 3.0) {
-                          _mostrarSnackBar(
-                            'Insira uma altura realista (entre 0.25m e 3.0m).',
-                            Colors.orange,
-                            Icons.warning,
-                          );
-                          return;
-                        }
-
-                        setState(() {
-                          _resultado = CalculadorDeImc.calculadorDeImc(
-                            peso,
-                            altura,
-                          );
-                          _repo.adicionarRegistro(
-                            nome: _nomePessoa.text,
-                            peso: peso,
-                            altura: altura,
-                          );
-                          _exibirResultado = true;
-                        });
-
-                        _mostrarSnackBar(
-                          'Registo salvo com sucesso!',
-                          Colors.green,
-                          Icons.check_circle,
-                        );
-
-                        // 3. LIMPEZA DOS CAMPOS
-                        // Limpamos o peso automaticamente para facilitar um novo cadastro,
-                        // e tiramos o foco para fechar o teclado do celular.
-                        _pesoPessoa.clear();
-                        FocusScope.of(context).unfocus();
-                      } else {
-                        _mostrarSnackBar(
-                          'Por favor, corrija os erros nos campos.',
-                          Colors.redAccent,
-                          Icons.error,
-                        );
-                      }
-                    },
-                    style: ElevatedButton.styleFrom(
+                // Botão Secundário: Novo Cálculo
+                if (_exibirResultado)
+                  OutlinedButton.icon(
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('Novo Cálculo'),
+                    onPressed: _novoCalculo,
+                    style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 16),
-                      backgroundColor:
-                          Theme.of(
-                            context,
-                          ).colorScheme.primary, // Cor do botão do tema
-                      foregroundColor:
-                          Theme.of(
-                            context,
-                          ).colorScheme.onPrimary, // Cor do texto do botão
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
                   ),
-                  const SizedBox(height: 10),
-
-                  // Botão NOVO CÁLCULO
-                  if (_exibirResultado)
-                    OutlinedButton.icon(
-                      icon: const Icon(Icons.refresh),
-                      onPressed: () {
-                        setState(() {
-                          _resultado = "";
-                          _exibirResultado = false;
-                          _pesoPessoa.text = "";
-                          _alturaPessoa.text = "";
-                          _nomePessoa.text = "";
-                        });
-                      },
-                      label: const Text('Novo Calculo'),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
+              ],
             ),
           ),
         ),

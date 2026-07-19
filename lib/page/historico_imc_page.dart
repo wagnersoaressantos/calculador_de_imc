@@ -174,19 +174,8 @@ class _HistoricoImcPageState extends State<HistoricoImcPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Histórico de IMC")),
-      floatingActionButton: FloatingActionButton(
-        child: const Icon(Icons.add),
-        onPressed: () async {
-          await Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const CalcularImcPage()),
-          );
-          setState(() {
-            _carregarDados();
-          });
-        },
-      ),
+      // 🔥 REMOVIDOS: appBar e floatingActionButton, pois a HomePage já tem os seus!
+      // Isso resolve o erro (crash) de múltiplos botões flutuantes a competir.
       body:
           _listaPessoas.isEmpty
               ? const Center(child: Text("Nenhum histórico encontrado."))
