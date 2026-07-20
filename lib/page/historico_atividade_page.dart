@@ -1,3 +1,5 @@
+import 'package:calculadora_imc/model/atividade_model.dart';
+import 'package:calculadora_imc/model/pessoa_model.dart';
 import 'package:calculadora_imc/model/sessao_usuario.dart';
 import 'package:calculadora_imc/service_locator.dart';
 import 'package:flutter/material.dart';
@@ -10,14 +12,11 @@ class HistoricoAtividadePage extends StatefulWidget {
 }
 
 class _HistoricoAtividadePageState extends State<HistoricoAtividadePage> {
-  // 🔥 FASE 3: Em vez de ir buscar todas as pessoas ao repositório,
-  // lemos diretamente o perfil ativo na sessão!
   final _sessao = getIt<SessaoUsuario>();
 
   @override
   void initState() {
     super.initState();
-    // Ouve as alterações de sessão para atualizar a lista se o perfil mudar
     _sessao.addListener(_atualizarTela);
   }
 
@@ -31,6 +30,108 @@ class _HistoricoAtividadePageState extends State<HistoricoAtividadePage> {
     if (mounted) setState(() {});
   }
 
+  // 🔥 FASE 4: Função para editar um registro sem precisar apagar
+  void _mostrarDialogoEdicao(PessoaModel pessoa, AtividadeModel atividade) {
+    final tipoController = TextEditingController(text: atividade.tipo);
+    final duracaoController = TextEditingController(
+      text: atividade.duracao.toString(),
+    );
+    String intensidadeSelecionada = atividade.intensidade;
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setStateDialog) {
+            return AlertDialog(
+              title: const Text("Editar Atividade"),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: tipoController,
+                    decoration: const InputDecoration(
+                      labelText: "Atividade",
+                      prefixIcon: Icon(Icons.directions_run),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: duracaoController,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: "Duração (min)",
+                      prefixIcon: Icon(Icons.timer),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  DropdownButtonFormField<String>(
+                    value: intensidadeSelecionada,
+                    items:
+                        ["Leve", "Moderada", "Intensa"]
+                            .map(
+                              (i) => DropdownMenuItem(value: i, child: Text(i)),
+                            )
+                            .toList(),
+                    onChanged: (val) {
+                      if (val != null) {
+                        setStateDialog(() => intensidadeSelecionada = val);
+                      }
+                    },
+                    decoration: const InputDecoration(
+                      labelText: "Intensidade",
+                      prefixIcon: Icon(Icons.fitness_center),
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text(
+                    "Cancelar",
+                    style: TextStyle(color: Colors.grey),
+                  ),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    int novaDuracao = int.tryParse(duracaoController.text) ?? 0;
+                    if (tipoController.text.isNotEmpty && novaDuracao > 0) {
+                      setState(() {
+                        // Atualiza a atividade
+                        atividade.tipo = tipoController.text.trim();
+                        atividade.duracao = novaDuracao;
+                        atividade.intensidade = intensidadeSelecionada;
+                        atividade.caloriasGastas =
+                            novaDuracao * 5.0; // Recálculo básico
+                        pessoa.save(); // Salva no Hive
+                      });
+                      Navigator.pop(context);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text("Atividade atualizada com sucesso!"),
+                          backgroundColor: Colors.green,
+                        ),
+                      );
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text("Valores inválidos."),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                    }
+                  },
+                  child: const Text("Guardar Alterações"),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final usuario = _sessao.usuarioAtivo;
@@ -38,31 +139,34 @@ class _HistoricoAtividadePageState extends State<HistoricoAtividadePage> {
     return Scaffold(
       body:
           usuario == null
-              // Se não há ninguém selecionado
               ? const Center(
                 child: Text(
-                  "Nenhum perfil ativo.\nSelecione um perfil no ecrã inicial.",
+                  "Nenhum perfil ativo.\nSelecione um perfil no topo do ecrã.",
                   textAlign: TextAlign.center,
                 ),
               )
-              // Se o utilizador não tem atividades
               : usuario.atividades.isEmpty
               ? Center(
                 child: Text(
                   "Olá, ${usuario.nome}!\nAinda não registaste nenhuma atividade.",
                   textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 16, color: Colors.grey),
                 ),
               )
-              // Se tem atividades, mostra a lista dele!
               : SafeArea(
                 child: ListView.builder(
                   itemCount: usuario.atividades.length,
                   itemBuilder: (_, index) {
-                    // Vamos inverter a ordem para ver a mais recente primeiro
                     final atividade =
                         usuario.atividades[usuario.atividades.length -
                             1 -
                             index];
+
+                    // Formatação enriquecida de Data e Hora
+                    final dataStr =
+                        "${atividade.data.day.toString().padLeft(2, '0')}/${atividade.data.month.toString().padLeft(2, '0')}/${atividade.data.year}";
+                    final horaStr =
+                        "${atividade.data.hour.toString().padLeft(2, '0')}:${atividade.data.minute.toString().padLeft(2, '0')}";
 
                     return Dismissible(
                       key: Key('ativ_${atividade.data.millisecondsSinceEpoch}'),
@@ -71,16 +175,66 @@ class _HistoricoAtividadePageState extends State<HistoricoAtividadePage> {
                         color: Colors.red,
                         alignment: Alignment.centerRight,
                         padding: const EdgeInsets.symmetric(horizontal: 20),
-                        child: const Icon(Icons.delete, color: Colors.white),
+                        child: const Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.delete, color: Colors.white, size: 30),
+                            Text(
+                              "Apagar",
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
+                      // 🔥 AQUI ESTÁ A CONFIRMAÇÃO DE EXCLUSÃO (FASE 4)
+                      confirmDismiss: (direction) async {
+                        return await showDialog(
+                          context: context,
+                          builder: (BuildContext context) {
+                            return AlertDialog(
+                              title: const Text("Excluir Atividade?"),
+                              content: const Text(
+                                "Tem certeza que deseja apagar esta atividade?\n\nEsta ação não pode ser desfeita.",
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed:
+                                      () => Navigator.of(context).pop(false),
+                                  child: const Text(
+                                    "Cancelar",
+                                    style: TextStyle(color: Colors.grey),
+                                  ),
+                                ),
+                                ElevatedButton(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.red,
+                                  ),
+                                  onPressed:
+                                      () => Navigator.of(context).pop(true),
+                                  child: const Text(
+                                    "Sim, Excluir",
+                                    style: TextStyle(color: Colors.white),
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
+                        );
+                      },
                       onDismissed: (direction) {
-                        // 🔥 Apaga a atividade e guarda as alterações no perfil
                         setState(() {
                           usuario.atividades.remove(atividade);
                           usuario.save();
                         });
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Atividade removida!')),
+                          const SnackBar(
+                            content: Text('Atividade removida!'),
+                            backgroundColor: Colors.redAccent,
+                            behavior: SnackBarBehavior.floating,
+                          ),
                         );
                       },
                       child: Card(
@@ -100,17 +254,34 @@ class _HistoricoAtividadePageState extends State<HistoricoAtividadePage> {
                           ),
                           subtitle: Text(
                             "Intensidade: ${atividade.intensidade}\n"
-                            "Data: ${atividade.data.day}/${atividade.data.month}/${atividade.data.year}",
+                            "Data: $dataStr às $horaStr", // 🔥 FASE 4: Hora Exata
                           ),
-                          trailing: Text(
-                            atividade.caloriasGastas != null
-                                ? "${atividade.caloriasGastas!.toStringAsFixed(0)} kcal"
-                                : "---",
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: Colors.orange,
-                              fontSize: 16,
-                            ),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                atividade.caloriasGastas != null
+                                    ? "${atividade.caloriasGastas!.toStringAsFixed(0)} kcal"
+                                    : "---",
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.orange,
+                                  fontSize: 16,
+                                ),
+                              ),
+                              // 🔥 FASE 4: Botão de Edição
+                              IconButton(
+                                icon: const Icon(
+                                  Icons.edit,
+                                  color: Colors.blue,
+                                ),
+                                onPressed:
+                                    () => _mostrarDialogoEdicao(
+                                      usuario,
+                                      atividade,
+                                    ),
+                              ),
+                            ],
                           ),
                         ),
                       ),

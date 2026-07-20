@@ -28,7 +28,9 @@ class _HistoricoImcPageState extends State<HistoricoImcPage> {
   }
 
   void _carregarDados() {
-    _listaPessoas = _repo.listarPessoas();
+    setState(() {
+      _listaPessoas = _repo.listarPessoas();
+    });
   }
 
   Color _corParaNivelIMC(String classificacao) {
@@ -43,6 +45,98 @@ class _HistoricoImcPageState extends State<HistoricoImcPage> {
     return Colors.red;
   }
 
+  // 🔥 FASE 4: Modal de edição de peso e altura do registo passado
+  void _mostrarDialogoEdicao(PessoaModel pessoa, RegistroImcModel registro) {
+    final pesoController = TextEditingController(
+      text: registro.peso.toString(),
+    );
+    final alturaController = TextEditingController(
+      text: registro.altura.toString(),
+    );
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text("Editar Medição"),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: pesoController,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                decoration: const InputDecoration(
+                  labelText: "Peso (kg)",
+                  prefixIcon: Icon(Icons.monitor_weight),
+                ),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: alturaController,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                decoration: const InputDecoration(
+                  labelText: "Altura (m)",
+                  prefixIcon: Icon(Icons.height),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text(
+                "Cancelar",
+                style: TextStyle(color: Colors.grey),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                double novoPeso =
+                    double.tryParse(pesoController.text.replaceAll(',', '.')) ??
+                    0;
+                double novaAltura =
+                    double.tryParse(
+                      alturaController.text.replaceAll(',', '.'),
+                    ) ??
+                    0;
+
+                if (novoPeso >= 2.0 && novaAltura >= 0.4) {
+                  if (novaAltura > 3.0) novaAltura = novaAltura / 100;
+                  setState(() {
+                    registro.peso = novoPeso;
+                    registro.altura = novaAltura;
+                    registro.imc = novoPeso / (novaAltura * novaAltura);
+                    pessoa.save(); // Salva as alterações
+                    _carregarDados(); // Força a atualização do gráfico
+                  });
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text("Registo atualizado com sucesso!"),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text("Valores inválidos."),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              },
+              child: const Text("Guardar Correção"),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   Widget _construirGraficoEvolucao(List<RegistroImcModel> registros) {
     if (registros.length < 2) {
       return const Padding(
@@ -54,19 +148,13 @@ class _HistoricoImcPageState extends State<HistoricoImcPage> {
         ),
       );
     }
-    // 1. Obter todos os valores de IMC para encontrar o mínimo e o máximo
+
     List<double> valoresImc = registros.map((r) => r.imc).toList();
     double minImc = valoresImc.reduce(min);
     double maxImc = valoresImc.reduce(max);
 
-    // 2. Dar uma folga de 2 pontos (ou pelo menos 1 se a variação for mínima)
-    // para que a linha nunca toque no teto ou no chão do gráfico
     double minY = (minImc - 2.0).floorToDouble();
     double maxY = (maxImc + 2.0).ceilToDouble();
-
-    // Se a variação entre o mínimo e o máximo for muito pequena (ex: 24.8 a 25.5),
-    // o intervalo de 2.0 que definimos pode ser muito grande.
-    // Vamos calcular um intervalo mais inteligente.
     double intervalo = (maxY - minY) > 10 ? 2.0 : 1.0;
 
     List<FlSpot> pontosDoGrafico =
@@ -75,7 +163,7 @@ class _HistoricoImcPageState extends State<HistoricoImcPage> {
         }).toList();
 
     return Container(
-      height: 250, // 🔥 Aumentámos um pouco a altura para os números respirarem
+      height: 250,
       padding: const EdgeInsets.only(
         right: 20.0,
         left: 10.0,
@@ -84,17 +172,14 @@ class _HistoricoImcPageState extends State<HistoricoImcPage> {
       ),
       child: LineChart(
         LineChartData(
-          // 🔥 CORREÇÃO DO TOOLTIP (Balão ao clicar)
           minY: minY,
           maxY: maxY,
           lineTouchData: LineTouchData(
             touchTooltipData: LineTouchTooltipData(
               getTooltipColor:
-                  (LineBarSpot touchedSpot) =>
-                      Colors.blueGrey.withOpacity(0.8), // CORRIGIDO AQUI
+                  (LineBarSpot touchedSpot) => Colors.blueGrey.withOpacity(0.8),
               getTooltipItems: (List<LineBarSpot> touchedSpots) {
                 return touchedSpots.map((spot) {
-                  // Formatamos para 1 casa decimal e adicionamos o "IMC" no balão
                   return LineTooltipItem(
                     "IMC: ${spot.y.toStringAsFixed(1)}",
                     const TextStyle(
@@ -108,7 +193,7 @@ class _HistoricoImcPageState extends State<HistoricoImcPage> {
           ),
           gridData: FlGridData(
             show: true,
-            drawVerticalLine: false, // Tira as linhas em pé
+            drawVerticalLine: false,
             horizontalInterval: intervalo,
             getDrawingHorizontalLine: (value) {
               return FlLine(
@@ -130,19 +215,14 @@ class _HistoricoImcPageState extends State<HistoricoImcPage> {
             leftTitles: AxisTitles(
               sideTitles: SideTitles(
                 showTitles: true,
-                reservedSize:
-                    40, // 🔥 Dá espaço suficiente para o número não cortar
-                interval:
-                    2.0, // 🔥 Força a desenhar números apenas a cada 2 pontos de IMC (ex: 22, 24, 26)
+                reservedSize: 40,
+                interval: intervalo,
                 getTitlesWidget: (value, meta) {
-                  // 🔥 Formata o número do eixo Y para não ter dezenas de casas decimais
                   return SideTitleWidget(
-                    meta: meta, // CORRIGIDO AQUI
+                    meta: meta,
                     space: 8.0,
                     child: Text(
-                      value.toStringAsFixed(
-                        0,
-                      ), // Mostra o número inteiro no eixo
+                      value.toStringAsFixed(0),
                       style: const TextStyle(color: Colors.grey, fontSize: 12),
                     ),
                   );
@@ -156,8 +236,7 @@ class _HistoricoImcPageState extends State<HistoricoImcPage> {
               spots: pontosDoGrafico,
               isCurved: true,
               color: Theme.of(context).primaryColor,
-              barWidth:
-                  3, // 🔥 Linha ligeiramente mais fina para ficar elegante
+              barWidth: 3,
               isStrokeCapRound: true,
               dotData: const FlDotData(show: true),
               belowBarData: BarAreaData(
@@ -174,8 +253,19 @@ class _HistoricoImcPageState extends State<HistoricoImcPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // 🔥 REMOVIDOS: appBar e floatingActionButton, pois a HomePage já tem os seus!
-      // Isso resolve o erro (crash) de múltiplos botões flutuantes a competir.
+      appBar: AppBar(title: const Text("Histórico de IMC")),
+      floatingActionButton: FloatingActionButton(
+        child: const Icon(Icons.add),
+        onPressed: () async {
+          await Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const CalcularImcPage()),
+          );
+          setState(() {
+            _carregarDados();
+          });
+        },
+      ),
       body:
           _listaPessoas.isEmpty
               ? const Center(child: Text("Nenhum histórico encontrado."))
@@ -300,6 +390,12 @@ class _HistoricoImcPageState extends State<HistoricoImcPage> {
                                           registro.imc,
                                         );
 
+                                    // 🔥 FASE 4: Enriquecimento de Data e Hora
+                                    final dataStr =
+                                        "${registro.data.day.toString().padLeft(2, '0')}/${registro.data.month.toString().padLeft(2, '0')}/${registro.data.year}";
+                                    final horaStr =
+                                        "${registro.data.hour.toString().padLeft(2, '0')}:${registro.data.minute.toString().padLeft(2, '0')}";
+
                                     return Dismissible(
                                       key: Key(
                                         "imc_${pessoa.key}_${registro.data.millisecondsSinceEpoch}_${_random.nextInt(10000)}",
@@ -316,6 +412,53 @@ class _HistoricoImcPageState extends State<HistoricoImcPage> {
                                           color: Colors.white,
                                         ),
                                       ),
+                                      // 🔥 CORREÇÃO FASE 4: Confirmação antes de apagar medição individual de IMC
+                                      confirmDismiss: (direction) async {
+                                        return await showDialog(
+                                          context: context,
+                                          builder: (BuildContext context) {
+                                            return AlertDialog(
+                                              title: const Text(
+                                                "Excluir Registo?",
+                                              ),
+                                              content: const Text(
+                                                "Tem certeza que deseja apagar esta medição de IMC?\n\nEsta ação não pode ser desfeita.",
+                                              ),
+                                              actions: [
+                                                TextButton(
+                                                  onPressed:
+                                                      () => Navigator.of(
+                                                        context,
+                                                      ).pop(false),
+                                                  child: const Text(
+                                                    "Cancelar",
+                                                    style: TextStyle(
+                                                      color: Colors.grey,
+                                                    ),
+                                                  ),
+                                                ),
+                                                ElevatedButton(
+                                                  style:
+                                                      ElevatedButton.styleFrom(
+                                                        backgroundColor:
+                                                            Colors.red,
+                                                      ),
+                                                  onPressed:
+                                                      () => Navigator.of(
+                                                        context,
+                                                      ).pop(true),
+                                                  child: const Text(
+                                                    "Sim, Excluir",
+                                                    style: TextStyle(
+                                                      color: Colors.white,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            );
+                                          },
+                                        );
+                                      },
                                       onDismissed: (direction) {
                                         setState(() {
                                           pessoa.registros.removeAt(indexReg);
@@ -357,9 +500,20 @@ class _HistoricoImcPageState extends State<HistoricoImcPage> {
                                           ),
                                           subtitle: Text(
                                             "Peso: ${registro.peso} kg\n"
-                                            "Altura: ${registro.altura} m\n"
                                             "Classificação: $classificacao\n"
-                                            "Data: ${registro.data.day.toString().padLeft(2, '0')}/${registro.data.month.toString().padLeft(2, '0')}/${registro.data.year}",
+                                            "Data: $dataStr às $horaStr", // Hora inserida
+                                          ),
+                                          // 🔥 FASE 4: Lápis de edição ao lado
+                                          trailing: IconButton(
+                                            icon: const Icon(
+                                              Icons.edit,
+                                              color: Colors.blue,
+                                            ),
+                                            onPressed:
+                                                () => _mostrarDialogoEdicao(
+                                                  pessoa,
+                                                  registro,
+                                                ),
                                           ),
                                         ),
                                       ),
