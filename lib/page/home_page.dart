@@ -1,8 +1,7 @@
-import 'package:calculadora_imc/model/pessoa_model.dart';
 import 'package:calculadora_imc/model/sessao_usuario.dart';
 import 'package:calculadora_imc/page/atividade_page.dart';
 import 'package:calculadora_imc/page/calcular_imc_page.dart';
-import 'package:calculadora_imc/page/configuracoes_page.dart';
+import 'package:calculadora_imc/page/perfil_page.dart';
 import 'package:calculadora_imc/page/dashboard_page.dart';
 import 'package:calculadora_imc/page/historico_atividade_page.dart';
 import 'package:calculadora_imc/page/historico_imc_page.dart';
@@ -22,6 +21,31 @@ class _HomePageState extends State<HomePage> {
   int _indiceAba = 0;
   final _repo = getIt<PessoaRepository>();
   final _sessao = getIt<SessaoUsuario>();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_sessao.usuarioAtivo == null) {
+        final pessoas = _repo.listarPessoas();
+        if (pessoas.isNotEmpty) {
+          _sessao.selecionarUsuario(pessoas.first);
+        }
+      }
+    });
+
+    _sessao.addListener(_atualizarTela);
+  }
+
+  @override
+  void dispose() {
+    _sessao.removeListener(_atualizarTela);
+    super.dispose();
+  }
+
+  void _atualizarTela() {
+    if (mounted) setState(() {});
+  }
 
   void _mudarAba(int indice) {
     setState(() {
@@ -84,39 +108,60 @@ class _HomePageState extends State<HomePage> {
                               )
                               : null,
                       onTap: () {
-                        setState(() {
-                          _sessao.selecionarUsuario(pessoa);
-                        });
+                        _sessao.selecionarUsuario(pessoa);
                         Navigator.pop(context);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              "Perfil alterado para ${pessoa.nome}",
-                            ),
-                          ),
-                        );
                       },
                     );
                   }),
                 const Divider(),
+
+                // 🔥 CORREÇÃO: Adicionámos a opção de Editar o perfil que está selecionado agora
+                if (_sessao.usuarioAtivo != null)
+                  ListTile(
+                    leading: const CircleAvatar(
+                      backgroundColor: Colors.transparent,
+                      child: Icon(Icons.edit, color: Colors.orange),
+                    ),
+                    title: Text(
+                      "Editar Perfil (${_sessao.usuarioAtivo!.nome})",
+                      style: const TextStyle(color: Colors.orange),
+                    ),
+                    onTap: () {
+                      Navigator.pop(context); // Fecha a lista
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          // Envia o perfil ativo para a página forçar o MODO EDIÇÃO
+                          builder:
+                              (context) => PerfilPage(
+                                pessoaExistente: _sessao.usuarioAtivo,
+                              ),
+                        ),
+                      ).then((_) {
+                        setState(() {});
+                      });
+                    },
+                  ),
+
+                // Botão de Criar (Continua a mandar vazio para modo criação)
                 ListTile(
                   leading: const CircleAvatar(
                     backgroundColor: Colors.transparent,
                     child: Icon(Icons.person_add, color: Colors.blue),
                   ),
                   title: const Text(
-                    "Criar / Editar Novo Perfil",
+                    "Criar Novo Perfil",
                     style: TextStyle(color: Colors.blue),
                   ),
                   onTap: () {
                     Navigator.pop(context);
                     Navigator.push(
                       context,
+                      // Não passa utilizador nenhum = MODO CRIAÇÃO
                       MaterialPageRoute(
-                        builder: (context) => const ConfiguracoesPage(),
+                        builder: (context) => const PerfilPage(),
                       ),
                     ).then((_) {
-                      // Se o utilizador criou um perfil e voltou, atualizamos a lista!
                       setState(() {});
                     });
                   },
@@ -127,23 +172,6 @@ class _HomePageState extends State<HomePage> {
         );
       },
     );
-  }
-
-  // 🔥 Método limpo para tratar a ação do botão flutuante
-  void _aoClicarNoBotaoFlutuante() {
-    if (_indiceAba == 1) {
-      // 1 = Histórico IMC
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => const CalcularImcPage()),
-      );
-    } else if (_indiceAba == 2) {
-      // 2 = Atividades
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => const AtividadePage()),
-      );
-    }
   }
 
   @override
@@ -160,7 +188,6 @@ class _HomePageState extends State<HomePage> {
         corpoAba = const HistoricoAtividadePage();
         break;
       case 3:
-        // 🔥 A aba de calcular IMC renderiza a página diretamente
         corpoAba = const CalcularImcPage();
         break;
       default:
@@ -190,18 +217,28 @@ class _HomePageState extends State<HomePage> {
         ],
       ),
       body: corpoAba,
-      // 🔥 O botão flutuante não é mais necessário na aba de calcular IMC (índice 3)
       floatingActionButton:
           (_indiceAba == 0 || _indiceAba == 3)
               ? null
               : FloatingActionButton(
-                onPressed: _aoClicarNoBotaoFlutuante,
+                onPressed: () {
+                  if (_indiceAba == 1) {
+                    setState(() {
+                      _indiceAba = 3;
+                    });
+                  } else if (_indiceAba == 2) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const AtividadePage(),
+                      ),
+                    );
+                  }
+                },
                 child: const Icon(Icons.add),
               ),
       bottomNavigationBar: BottomNavigationBar(
-        type:
-            BottomNavigationBarType
-                .fixed, // Permite mais de 3 itens com cores visíveis
+        type: BottomNavigationBarType.fixed,
         currentIndex: _indiceAba,
         onTap: _mudarAba,
         items: const [
@@ -217,7 +254,6 @@ class _HomePageState extends State<HomePage> {
             icon: Icon(Icons.directions_run),
             label: "Atividades",
           ),
-          // 🔥 Novo botão para calcular o IMC
           BottomNavigationBarItem(
             icon: Icon(Icons.calculate),
             label: "Calcular IMC",

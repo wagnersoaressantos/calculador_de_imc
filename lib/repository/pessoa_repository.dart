@@ -1,99 +1,80 @@
+import 'package:calculadora_imc/model/pessoa_model.dart';
+import 'package:calculadora_imc/model/registro_imc_model.dart';
 import 'package:hive/hive.dart';
-import 'package:flutter/foundation.dart'; // Necessário para o debugPrint
-import '../model/pessoa_model.dart';
-import '../model/registro_imc_model.dart';
 
 class PessoaRepository {
-  // Pegamos a box, mas vamos ter cuidado ao manipulá-la!
-  final Box<PessoaModel> _box = Hive.box<PessoaModel>('pessoas');
+  static const String boxName = 'pessoasBox';
 
-  // 🔹 Criar ou buscar pessoa (Com tratamento de erro)
-  PessoaModel? obterOuCriarPessoa(String nome, double altura) {
-    // 1ª Camada de Segurança: A caixa está aberta?
-    if (!_box.isOpen) {
-      debugPrint("ERRO: A box do Hive está fechada!");
-      return null;
-    }
-
-    try {
-      final pessoa = _box.values.firstWhere(
-        (p) => p.nome == nome,
-        orElse: () {
-          final novaPessoa = PessoaModel(
-            nome: nome,
-            altura: altura,
-            registros: [],
-            atividades: [],
-          );
-          // 2ª Camada: Tenta adicionar. Se a memória estiver cheia, o catch apanha.
-          _box.add(novaPessoa);
-          return novaPessoa;
-        },
-      );
-      return pessoa;
-    } catch (e) {
-      debugPrint("ERRO ao obter ou criar pessoa: $e");
-      return null;
-    }
+  List<PessoaModel> listarPessoas() {
+    var box = Hive.box<PessoaModel>(boxName);
+    return box.values.toList();
   }
 
-  // 🔹 Adicionar IMC corretamente (Com tratamento de erro)
-  bool adicionarRegistro({
+  // Modificado para aceitar os novos campos opcionais
+  PessoaModel? obterOuCriarPessoa(
+    String nome,
+    double alturaAtual, {
+    double pesoMeta = 0.0,
+    String objetivo = "Manter",
+  }) {
+    var box = Hive.box<PessoaModel>(boxName);
+    PessoaModel? pessoa;
+
+    try {
+      pessoa = box.values.firstWhere(
+        (p) => p.nome.toLowerCase() == nome.toLowerCase(),
+      );
+      // Se a pessoa já existe, não sobrecrevemos as metas e altura padrão aqui,
+      // a menos que estejamos explicitamente a atualizá-la noutro lado.
+    } catch (e) {
+      // Se não existir, criamos a pessoa com os novos campos
+      pessoa = PessoaModel(
+        nome: nome,
+        registros: [],
+        alturaPadrao: alturaAtual,
+        pesoMeta: pesoMeta,
+        objetivo: objetivo,
+      );
+      box.add(pessoa);
+    }
+    return pessoa;
+  }
+
+  void adicionarRegistro({
     required String nome,
     required double peso,
     required double altura,
   }) {
-    try {
-      final pessoa = obterOuCriarPessoa(nome, altura);
+    var box = Hive.box<PessoaModel>(boxName);
+    var pessoa = obterOuCriarPessoa(nome, altura);
 
-      // Se deu erro ao buscar a pessoa, cancelamos a gravação e avisamos a UI (retornando false)
-      if (pessoa == null) return false;
-
-      final imc = peso / (altura * altura);
-
-      final registro = RegistroImcModel(
+    if (pessoa != null) {
+      var registro = RegistroImcModel(
         peso: peso,
         altura: altura,
-        imc: imc,
+        imc: peso / (altura * altura),
         data: DateTime.now(),
       );
-
       pessoa.registros.add(registro);
-
-      // Salva no banco. Pode falhar se houver corrupção de dados ou falta de espaço
+      // Atualizamos também a altura padrão para a última altura medida (opcional, mas bom para UX)
+      pessoa.alturaPadrao = altura;
       pessoa.save();
-
-      return true; // Sucesso absoluto!
-    } catch (e) {
-      debugPrint("ERRO Crítico ao tentar gravar o registro de IMC: $e");
-      return false; // Retornamos falso em vez de fechar a aplicação
     }
   }
 
-  // 🔹 Listar pessoas (Com segurança)
-  List<PessoaModel> listarPessoas() {
-    if (!_box.isOpen)
-      return []; // Retorna lista vazia se a box estiver inacessível
-
-    try {
-      return _box.values.toList();
-    } catch (e) {
-      debugPrint("ERRO ao listar pessoas: $e");
-      return []; // Protege a UI devolvendo uma lista vazia em vez de quebrar a tela
-    }
+  void atualizarPessoa(PessoaModel pessoa) {
+    pessoa.save();
   }
 
-  // 🔹 Buscar por nome
-  PessoaModel? buscarPorNome(String nome) {
-    if (!_box.isOpen) return null;
-
+  void removerPessoa(String nome) {
+    var box = Hive.box<PessoaModel>(boxName);
     try {
-      return _box.values.firstWhere((p) => p.nome == nome);
+      var pessoa = box.values.firstWhere(
+        (p) => p.nome.toLowerCase() == nome.toLowerCase(),
+      );
+      pessoa.delete();
     } catch (e) {
-      // O firstWhere lança erro se não encontrar ninguém.
-      // O catch captura isso pacificamente.
-      debugPrint("Pessoa não encontrada ou erro na busca: $e");
-      return null;
+      // Pessoa não encontrada
     }
   }
 }

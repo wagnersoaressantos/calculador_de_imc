@@ -22,13 +22,14 @@ class PessoaModelAdapter extends TypeAdapter<PessoaModel> {
       alturaPadrao: fields[2] == null ? 0.0 : fields[2] as double,
       pesoMeta: fields[3] == null ? 0.0 : fields[3] as double,
       objetivo: fields[4] == null ? 'Manter' : fields[4] as String,
+      atividades: (fields[5] as List?)?.cast<AtividadeModel>(),
     );
   }
 
   @override
   void write(BinaryWriter writer, PessoaModel obj) {
     writer
-      ..writeByte(5)
+      ..writeByte(6)
       ..writeByte(0)
       ..write(obj.nome)
       ..writeByte(1)
@@ -38,7 +39,9 @@ class PessoaModelAdapter extends TypeAdapter<PessoaModel> {
       ..writeByte(3)
       ..write(obj.pesoMeta)
       ..writeByte(4)
-      ..write(obj.objetivo);
+      ..write(obj.objetivo)
+      ..writeByte(5)
+      ..write(obj.atividades);
   }
 
   @override

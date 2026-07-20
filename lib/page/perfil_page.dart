@@ -1,103 +1,141 @@
-import 'package:calculadora_imc/model/configuracao_model.dart';
-import 'package:calculadora_imc/repository/configuracoes_repository.dart';
+import 'package:calculadora_imc/model/pessoa_model.dart';
+import 'package:calculadora_imc/model/sessao_usuario.dart';
+import 'package:calculadora_imc/repository/pessoa_repository.dart';
+import 'package:calculadora_imc/service_locator.dart';
 import 'package:flutter/material.dart';
 
-class ConfiguracoesPage extends StatefulWidget {
-  const ConfiguracoesPage({super.key});
+class PerfilPage extends StatefulWidget {
+  // Se for nulo, a intenção é criar um utilizador TOTALMENTE novo.
+  // Se for enviado um modelo, a intenção é editar esse perfil existente.
+  final PessoaModel? pessoaExistente;
+
+  const PerfilPage({super.key, this.pessoaExistente});
 
   @override
-  State<ConfiguracoesPage> createState() => _ConfiguracoesPageState();
+  State<PerfilPage> createState() => _PerfilPageState();
 }
 
-class _ConfiguracoesPageState extends State<ConfiguracoesPage> {
-  late ConfiguracoesRepository configuracoesRepository;
-  ConfiguracoesModel configuracoesModel = ConfiguracoesModel.vazio();
+class _PerfilPageState extends State<PerfilPage> {
+  final _pessoaRepo = getIt<PessoaRepository>();
+  final _sessao = getIt<SessaoUsuario>();
 
   final TextEditingController _nomeController = TextEditingController();
   final TextEditingController _alturaController = TextEditingController();
   final TextEditingController _pesoMetaController = TextEditingController();
 
-  // 🔥 CORREÇÃO: Adicionada a _formKey que estava a faltar
   final _formKey = GlobalKey<FormState>();
 
   String _objetivoSelecionado = "Manter";
+  bool _isEdicao = false;
 
   @override
   void initState() {
     super.initState();
-    _carregarDados();
+    _carregarDadosPerfil();
   }
 
-  void _carregarDados() async {
-    configuracoesRepository = await ConfiguracoesRepository.load();
-    configuracoesModel = configuracoesRepository.pegarDados();
+  void _carregarDadosPerfil() {
+    // 🔥 CORREÇÃO: Removemos a ligação direta com "_sessao.usuarioAtivo" aqui.
+    // Assim garantimos que o botão "Criar Novo Perfil" traga sempre uma página em branco.
 
-    setState(() {
-      _nomeController.text = configuracoesModel.nomeUsuario;
-      _alturaController.text = configuracoesModel.alturaUsuario.toString();
-      _pesoMetaController.text = configuracoesModel.pesoMeta.toString();
-      _objetivoSelecionado = configuracoesModel.objetivo;
-    });
+    if (widget.pessoaExistente != null) {
+      // 💡 MODO EDIÇÃO: Preenchemos os dados do perfil que recebemos
+      final pessoa = widget.pessoaExistente!;
+      _isEdicao = true;
+      _nomeController.text = pessoa.nome;
+      _alturaController.text =
+          pessoa.alturaPadrao > 0 ? pessoa.alturaPadrao.toString() : "";
+      _pesoMetaController.text =
+          pessoa.pesoMeta > 0 ? pessoa.pesoMeta.toString() : "";
+      _objetivoSelecionado = pessoa.objetivo;
+    } else {
+      // 💡 MODO CRIAÇÃO: A página fica vazia pronta para um novo utilizador!
+      _isEdicao = false;
+      _nomeController.clear();
+      _alturaController.clear();
+      _pesoMetaController.clear();
+      _objetivoSelecionado = "Manter";
+    }
   }
 
-  void _salvarConfiguracoes() {
-    // Validação usando o FormKey
+  void _salvarPerfil() {
     if (_formKey.currentState!.validate()) {
-      // Usar trim para limpar espaços como pedimos nos outros campos
-      configuracoesModel.nomeUsuario = _nomeController.text.trim();
-      configuracoesModel.alturaUsuario = double.parse(
-        _alturaController.text.replaceAll(',', '.'),
-      );
-      configuracoesModel.pesoMeta = double.parse(
-        _pesoMetaController.text.replaceAll(',', '.'),
-      );
-      configuracoesModel.objetivo = _objetivoSelecionado;
+      // Formatação dos dados
+      final nome = _nomeController.text.trim();
+      final altura =
+          double.tryParse(_alturaController.text.replaceAll(',', '.')) ?? 0.0;
+      final pesoMeta =
+          double.tryParse(_pesoMetaController.text.replaceAll(',', '.')) ?? 0.0;
 
-      configuracoesRepository.salvar(configuracoesModel);
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Métricas e Metas atualizadas com sucesso!"),
-          backgroundColor: Colors.green,
-        ),
+      // Obtém ou Cria no Hive
+      final pessoa = _pessoaRepo.obterOuCriarPessoa(
+        nome,
+        altura,
+        pesoMeta: pesoMeta,
+        objetivo: _objetivoSelecionado,
       );
 
-      // Fecha o teclado
-      FocusScope.of(context).unfocus();
+      if (pessoa != null) {
+        // Atualiza e guarda
+        pessoa.alturaPadrao = altura;
+        pessoa.pesoMeta = pesoMeta;
+        pessoa.objetivo = _objetivoSelecionado;
+        pessoa.save();
+
+        // Atualiza a Sessão
+        _sessao.selecionarUsuario(pessoa);
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              _isEdicao
+                  ? "Perfil atualizado com sucesso!"
+                  : "Novo perfil criado!",
+            ),
+            backgroundColor: Colors.green,
+          ),
+        );
+
+        FocusScope.of(context).unfocus();
+        Navigator.pop(context);
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // 🔥 Título atualizado
-      appBar: AppBar(title: const Text("Meu Perfil & Metas")),
+      appBar: AppBar(
+        title: Text(_isEdicao ? "Editar Perfil" : "Criar Novo Perfil"),
+      ),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24.0),
           child: Form(
-            key: _formKey, // 🔥 O Form usa a chave aqui
+            key: _formKey,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // 🔥 Cabeçalho explicativo adicionado
-                const Text(
-                  "Configure aqui as suas informações pessoais e os seus objetivos de saúde. Estes dados serão usados como padrão nos seus novos cálculos.",
-                  style: TextStyle(fontSize: 14, color: Colors.grey),
+                Text(
+                  _isEdicao
+                      ? "Atualize as suas informações e metas."
+                      : "Crie um novo perfil para guardar as suas atividades separadamente.",
+                  style: const TextStyle(fontSize: 14, color: Colors.grey),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 30),
 
                 TextFormField(
                   controller: _nomeController,
+                  enabled:
+                      !_isEdicao, // Bloqueia a alteração de nomes de perfis que já existem
                   decoration: const InputDecoration(
-                    labelText: "Seu Nome Padrão",
+                    labelText: "Seu Nome (Único)",
                     prefixIcon: Icon(Icons.person),
                   ),
                   validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
+                    if (value == null || value.trim().isEmpty)
                       return 'O nome não pode estar vazio';
-                    }
                     return null;
                   },
                 ),
@@ -109,7 +147,7 @@ class _ConfiguracoesPageState extends State<ConfiguracoesPage> {
                     decimal: true,
                   ),
                   decoration: const InputDecoration(
-                    labelText: "Altura Padrão (ex: 1.70)",
+                    labelText: "Sua Altura Padrão (ex: 1.70)",
                     prefixIcon: Icon(Icons.height),
                   ),
                   validator: (value) {
@@ -128,12 +166,12 @@ class _ConfiguracoesPageState extends State<ConfiguracoesPage> {
                     decimal: true,
                   ),
                   decoration: const InputDecoration(
-                    labelText: "Qual é a sua Meta de Peso? (kg)",
+                    labelText: "Sua Meta de Peso (kg)",
                     prefixIcon: Icon(Icons.flag),
                   ),
                   validator: (value) {
                     if (value == null || value.trim().isEmpty)
-                      return 'Informe uma meta (ou 0 para ignorar)';
+                      return 'Informe uma meta (ou 0)';
                     if (double.tryParse(value.replaceAll(',', '.')) == null)
                       return 'Valor inválido';
                     return null;
@@ -167,9 +205,9 @@ class _ConfiguracoesPageState extends State<ConfiguracoesPage> {
                 const SizedBox(height: 32),
 
                 ElevatedButton.icon(
-                  onPressed: _salvarConfiguracoes,
+                  onPressed: _salvarPerfil,
                   icon: const Icon(Icons.save),
-                  label: const Text("Salvar Perfil"),
+                  label: Text(_isEdicao ? "Atualizar Perfil" : "Criar Perfil"),
                   style: ElevatedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 16),
                   ),

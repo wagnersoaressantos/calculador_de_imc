@@ -1,6 +1,6 @@
-import 'package:calculadora_imc/page/configuracoes_page.dart';
-import 'package:calculadora_imc/page/dashboard_page.dart';
-import 'package:calculadora_imc/repository/configuracoes_repository.dart';
+import 'package:calculadora_imc/model/sessao_usuario.dart';
+import 'package:calculadora_imc/page/perfil_page.dart'; // Import corrigido
+import 'package:calculadora_imc/service_locator.dart';
 import 'package:flutter/material.dart';
 
 class CustonDrawer extends StatefulWidget {
@@ -11,36 +11,28 @@ class CustonDrawer extends StatefulWidget {
 }
 
 class _CustonDrawerState extends State<CustonDrawer> {
-  // Variáveis com valores iniciais enquanto os dados carregam
-  String _nomeUsuario = "Carregando...";
-  String _alturaUsuario = "";
+  final _sessao = getIt<SessaoUsuario>();
 
   @override
   void initState() {
     super.initState();
-    _carregarDadosPerfil();
+    _sessao.addListener(_atualizarDrawer);
   }
 
-  // 🧠 A MAGIA: Vai na memória do telemóvel buscar a configuração salva!
-  void _carregarDadosPerfil() async {
-    final repo = await ConfiguracoesRepository.load();
-    final config = repo.pegarDados();
+  @override
+  void dispose() {
+    _sessao.removeListener(_atualizarDrawer);
+    super.dispose();
+  }
 
-    // Atualiza a tela com os dados reais
-    setState(() {
-      _nomeUsuario =
-          config.nomeUsuario.isNotEmpty
-              ? config.nomeUsuario
-              : "Usuário Anônimo";
-      _alturaUsuario =
-          config.alturaUsuario > 0
-              ? "Altura: ${config.alturaUsuario}m"
-              : "Configure seu perfil";
-    });
+  void _atualizarDrawer() {
+    if (mounted) setState(() {});
   }
 
   @override
   Widget build(BuildContext context) {
+    final usuarioAtivo = _sessao.usuarioAtivo;
+
     return Drawer(
       child: ListView(
         padding: EdgeInsets.zero,
@@ -49,13 +41,11 @@ class _CustonDrawerState extends State<CustonDrawer> {
             decoration: BoxDecoration(
               color: Theme.of(context).colorScheme.primary,
             ),
-            // 🔥 REMOVIDA: A interação (GestureDetector) que mostrava opções falsas de Câmera/Galeria
             currentAccountPicture: CircleAvatar(
               backgroundColor: Theme.of(context).colorScheme.onPrimary,
               child: Text(
-                // Uma pequena brincadeira UX: mostrar a inicial do nome!
-                _nomeUsuario != "Carregando..." && _nomeUsuario.isNotEmpty
-                    ? _nomeUsuario[0].toUpperCase()
+                usuarioAtivo != null && usuarioAtivo.nome.isNotEmpty
+                    ? usuarioAtivo.nome[0].toUpperCase()
                     : "?",
                 style: TextStyle(
                   fontSize: 24,
@@ -64,45 +54,41 @@ class _CustonDrawerState extends State<CustonDrawer> {
                 ),
               ),
             ),
-            // 🔥 CORREÇÃO: Variáveis dinâmicas no lugar de textos engessados!
             accountName: Text(
-              _nomeUsuario,
+              usuarioAtivo != null ? usuarioAtivo.nome : "Selecione um Perfil",
               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
             ),
-            accountEmail: Text(_alturaUsuario),
+            accountEmail: Text(
+              usuarioAtivo != null && usuarioAtivo.alturaPadrao > 0
+                  ? "Altura Padrão: ${usuarioAtivo.alturaPadrao}m"
+                  : "Crie ou selecione um perfil",
+            ),
           ),
           const SizedBox(height: 10),
           ListTile(
-            // 🔥 MELHORIA UX: Renomeado de "Configurações" para refletir melhor a ação (Feedback Avaliadores)
             leading: const Icon(Icons.person_outline),
             title: const Text("Meu Perfil & Metas"),
             trailing: const Icon(Icons.arrow_forward_ios, size: 16),
             onTap: () {
-              Navigator.pop(context); // Fechar o drawer
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const ConfiguracoesPage(),
-                ),
-              );
-            },
-          ),
-          const Divider(),
-          // A OPÇÃO "DASHBOARD" FOI REMOVIDA DAQUI PARA EVITAR REDUNDÂNCIA!
-          // Antes havia um ListTile para o Dashboard aqui. Foi apagado conforme
-          // feedback dos avaliadores, pois o acesso já é feito pela HomePage.
-          ListTile(
-            leading: const Icon(Icons.settings),
-            title: const Text('Configurações'),
-            trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-            onTap: () {
               Navigator.pop(context);
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const ConfiguracoesPage(),
-                ),
-              );
+              if (usuarioAtivo != null) {
+                // 🔥 CORREÇÃO PRINCIPAL AQUI:
+                // Estamos a passar o "usuarioAtivo" para a PerfilPage.
+                // Isto avisa a página que não é para criar um novo, mas sim editar!
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder:
+                        (context) => PerfilPage(pessoaExistente: usuarioAtivo),
+                  ),
+                );
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Por favor, crie um perfil primeiro.'),
+                  ),
+                );
+              }
             },
           ),
           const Divider(),

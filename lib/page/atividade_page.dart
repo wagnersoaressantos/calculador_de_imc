@@ -1,5 +1,5 @@
 import 'package:calculadora_imc/model/atividade_model.dart';
-import 'package:calculadora_imc/repository/pessoa_repository.dart';
+import 'package:calculadora_imc/model/sessao_usuario.dart';
 import 'package:calculadora_imc/service_locator.dart';
 import 'package:flutter/material.dart';
 
@@ -11,191 +11,188 @@ class AtividadePage extends StatefulWidget {
 }
 
 class _AtividadePageState extends State<AtividadePage> {
-  // 1. TRATAMENTO DE STRINGS (.trim)
-  // O método .trim() remove espaços em branco indesejados que o usuário pode ter
-  // digitado acidentalmente no início ou no fim do texto.
-  // Exemplo: " Corrida " se transforma em "Corrida".
-  final TextEditingController _nomeController = TextEditingController();
+  // O cérebro da nossa app para saber quem está a usar
+  final _sessao = getIt<SessaoUsuario>();
+
+  final TextEditingController _tipoAtividadeController =
+      TextEditingController();
   final TextEditingController _duracaoController = TextEditingController();
 
-  String _tipoSelecionado = "Caminhada";
-  String _intensidadeSelecionada = "Leve";
+  // 🔥 NOVO: Variável para controlar o dropdown de intensidade,
+  // pois o AtividadeModel agora exige este campo obrigatório!
+  String _intensidadeSelecionada = "Moderada";
 
-  final _repo = getIt<PessoaRepository>();
+  void _salvarAtividade() {
+    // 1. Tratamento de Strings (.trim()) exigido no Roadmap
+    final tipoAtividade = _tipoAtividadeController.text.trim();
+    final duracaoTexto = _duracaoController.text.trim();
 
-  // 🔥 NOVO: O "Cérebro" que calcula as calorias usando a tabela MET
-  double _calcularCalorias(
-    String tipo,
-    String intensidade,
-    int duracaoMinutos,
-    double peso,
-  ) {
-    double met = 3.0; // Valor padrão de segurança
+    // 2. Pega o perfil ativo automaticamente!
+    final usuarioAtivo = _sessao.usuarioAtivo;
 
-    if (tipo == "Caminhada") {
-      if (intensidade == "Leve")
-        met = 2.5;
-      else if (intensidade == "Moderada")
-        met = 3.8;
-      else
-        met = 5.0; // Alta
-    } else if (tipo == "Corrida") {
-      if (intensidade == "Leve")
-        met = 6.0;
-      else if (intensidade == "Moderada")
-        met = 8.0;
-      else
-        met = 10.0;
-    } else if (tipo == "Academia") {
-      if (intensidade == "Leve")
-        met = 3.0;
-      else if (intensidade == "Moderada")
-        met = 5.0;
-      else
-        met = 6.0;
+    // Prevenção de Erro: Se ninguém estiver selecionado, impede a gravação
+    if (usuarioAtivo == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Por favor, selecione um perfil primeiro na tela inicial.',
+          ),
+        ),
+      );
+      return;
     }
 
-    // Fórmula: MET * Peso * Tempo em Horas
-    return met * peso * (duracaoMinutos / 60.0);
+    // Prevenção de Erro: Campos vazios
+    if (tipoAtividade.isEmpty || duracaoTexto.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Por favor, preencha todos os campos.')),
+      );
+      return;
+    }
+
+    // Prevenção de Erro: Duração inválida
+    int? duracao = int.tryParse(duracaoTexto);
+    if (duracao == null || duracao <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Por favor, insira uma duração válida em minutos.'),
+        ),
+      );
+      return;
+    }
+
+    // 3. Montagem do Modelo com os campos corretos!
+    // Aqui usamos os nomes exatos exigidos pelo AtividadeModel
+    var novaAtividade = AtividadeModel(
+      tipo: tipoAtividade,
+      duracao: duracao,
+      intensidade: _intensidadeSelecionada,
+      data: DateTime.now(),
+      // Opcional: Cálculo temporário simples de calorias base (5 kcal por min)
+      // ou pode usar a sua lógica do serviço de análise no futuro.
+      caloriasGastas: duracao * 5.0,
+    );
+
+    // 🔥 4. A GRANDE MUDANÇA ARQUITETURAL (Fase 3)
+    // Em vez de gravar numa "Caixa" (Box) solta, guardamos a atividade
+    // DENTRO da lista de atividades do perfil do utilizador.
+    // Assim o "historico_atividade_page" e a "analise_service" vão encontrar a atividade!
+    setState(() {
+      usuarioAtivo.atividades.add(novaAtividade);
+      usuarioAtivo.save(); // Guarda o perfil atualizado no Hive
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Atividade registrada com sucesso!'),
+        backgroundColor: Colors.green,
+      ),
+    );
+
+    // 5. Limpeza automática e melhoria de UX
+    _tipoAtividadeController.clear();
+    _duracaoController.clear();
+    setState(() {
+      _intensidadeSelecionada = "Moderada"; // Reseta o Dropdown
+    });
+    FocusScope.of(context).unfocus(); // Fecha o teclado
+  }
+
+  @override
+  void dispose() {
+    _tipoAtividadeController.dispose();
+    _duracaoController.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text("Registrar Atividade")),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            children: [
-              TextField(
-                controller: _nomeController,
-                decoration: const InputDecoration(
-                  labelText: "Seu nome",
-                  border: OutlineInputBorder(),
+      body: SingleChildScrollView(
+        // Protege contra quebra de layout quando o teclado abre
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Dica visual de UX: Mostra para quem estamos a gravar
+            if (_sessao.usuarioAtivo != null)
+              Container(
+                padding: const EdgeInsets.all(12),
+                margin: const EdgeInsets.only(bottom: 20.0),
+                decoration: BoxDecoration(
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.primaryContainer.withOpacity(0.5),
+                  borderRadius: BorderRadius.circular(10),
                 ),
-              ),
-              const SizedBox(height: 10),
-              DropdownButtonFormField<String>(
-                initialValue: _tipoSelecionado,
-                decoration: const InputDecoration(
-                  labelText: "Tipo de Atividade",
-                  border: OutlineInputBorder(),
-                ),
-                items:
-                    ["Caminhada", "Corrida", "Academia"]
-                        .map(
-                          (tipo) =>
-                              DropdownMenuItem(value: tipo, child: Text(tipo)),
-                        )
-                        .toList(),
-                onChanged: (value) => setState(() => _tipoSelecionado = value!),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: _duracaoController,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: "Duração (minutos)",
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 10),
-              DropdownButtonFormField<String>(
-                initialValue: _intensidadeSelecionada,
-                decoration: const InputDecoration(
-                  labelText: "Intensidade",
-                  border: OutlineInputBorder(),
-                ),
-                items:
-                    ["Leve", "Moderada", "Alta"]
-                        .map(
-                          (nivel) => DropdownMenuItem(
-                            value: nivel,
-                            child: Text(nivel),
-                          ),
-                        )
-                        .toList(),
-                onChanged:
-                    (value) => setState(() => _intensidadeSelecionada = value!),
-              ),
-              const SizedBox(height: 20),
-
-              // BOTÃO DE SALVAR REFORMULADO
-              ElevatedButton(
-                onPressed: () {
-                  // 1. TRATAMENTO DE STRINGS (.trim)
-                  // Remove espaços em branco do início e do final para não sujar o banco de dados.
-                  final nomeTexto = _nomeController.text.trim();
-                  final duracaoTexto = _duracaoController.text.trim();
-
-                  // 2. VALIDAÇÃO DE CAMPOS VAZIOS APÓS A LIMPEZA
-                  if (nomeTexto.isEmpty || duracaoTexto.isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text("Preencha todos os campos!"),
+                child: Row(
+                  children: [
+                    const Icon(Icons.person, color: Colors.blue),
+                    const SizedBox(width: 10),
+                    Text(
+                      "A registrar para: ${_sessao.usuarioAtivo!.nome}",
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
                       ),
-                    );
-                    return;
-                  }
-
-                  final duracao = int.tryParse(duracaoTexto) ?? 0;
-                  final pessoa = _repo.obterOuCriarPessoa(nomeTexto, 0);
-
-                  if (pessoa != null) {
-                    // 1. Inteligência: Buscar o último peso da pessoa
-                    double pesoAtual =
-                        70.0; // Peso "chutado" se for um usuário virgem
-                    if (pessoa.registros.isNotEmpty) {
-                      // Pega o peso do último registro de IMC feito na outra tela!
-                      pesoAtual = pessoa.registros.last.peso;
-                    }
-
-                    // 2. Calcula as calorias com base no peso real
-                    double calorias = _calcularCalorias(
-                      _tipoSelecionado,
-                      _intensidadeSelecionada,
-                      duracao,
-                      pesoAtual,
-                    );
-
-                    // 3. Cria a atividade incluindo as calorias
-                    final atividade = AtividadeModel(
-                      tipo: _tipoSelecionado,
-                      duracao: duracao,
-                      intensidade: _intensidadeSelecionada,
-                      data: DateTime.now(),
-                      caloriasGastas: calorias,
-                    );
-
-                    pessoa.atividades.add(atividade);
-                    pessoa.save();
-
-                    // 4. Mostra o Feedback super interativo e encorajador
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          "🔥 Sucesso! Você queimou cerca de ${calorias.toStringAsFixed(0)} kcal.",
-                        ),
-                        backgroundColor:
-                            Colors
-                                .orange, // Laranja combinando com fogo/calorias
-                        behavior: SnackBarBehavior.floating,
-                      ),
-                    );
-                  } else {
-                    debugPrint("Erro: Pessoa retornou nula.");
-                  }
-                  // 🔥 3. LIMPEZA AUTOMÁTICA DOS CAMPOS
-                  // Fecha o teclado e limpa os inputs para a próxima atividade
-                  _nomeController.clear();
-                  _duracaoController.clear();
-                  FocusScope.of(context).unfocus();
-                },
-                child: const Text("Salvar Atividade"),
+                    ),
+                  ],
+                ),
               ),
-            ],
-          ),
+
+            TextFormField(
+              controller: _tipoAtividadeController,
+              decoration: const InputDecoration(
+                labelText: "Qual atividade praticou? (ex: Corrida)",
+                prefixIcon: Icon(Icons.directions_run),
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            TextFormField(
+              controller: _duracaoController,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: "Duração (em minutos)",
+                prefixIcon: Icon(Icons.timer),
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // 🔥 NOVO: Dropdown para selecionar a intensidade!
+            DropdownButtonFormField<String>(
+              value: _intensidadeSelecionada,
+              decoration: const InputDecoration(
+                labelText: "Intensidade do Exercício",
+                prefixIcon: Icon(Icons.fitness_center),
+              ),
+              items:
+                  ["Leve", "Moderada", "Intensa"].map((String intensidade) {
+                    return DropdownMenuItem(
+                      value: intensidade,
+                      child: Text(intensidade),
+                    );
+                  }).toList(),
+              onChanged: (String? newValue) {
+                if (newValue != null) {
+                  setState(() {
+                    _intensidadeSelecionada = newValue;
+                  });
+                }
+              },
+            ),
+            const SizedBox(height: 32),
+
+            ElevatedButton.icon(
+              icon: const Icon(Icons.save),
+              onPressed: _salvarAtividade,
+              label: const Text("Salvar Atividade"),
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+              ),
+            ),
+          ],
         ),
       ),
     );

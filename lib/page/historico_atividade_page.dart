@@ -1,6 +1,4 @@
-import 'package:calculadora_imc/model/pessoa_model.dart';
-import 'package:calculadora_imc/page/atividade_page.dart';
-import 'package:calculadora_imc/repository/pessoa_repository.dart';
+import 'package:calculadora_imc/model/sessao_usuario.dart';
 import 'package:calculadora_imc/service_locator.dart';
 import 'package:flutter/material.dart';
 
@@ -12,86 +10,109 @@ class HistoricoAtividadePage extends StatefulWidget {
 }
 
 class _HistoricoAtividadePageState extends State<HistoricoAtividadePage> {
-  // Chamamos o repositório a partir da nossa "Caixa de Ferramentas"
-  final _repo = getIt<PessoaRepository>();
-  List<PessoaModel> _listaPessoas = [];
+  // 🔥 FASE 3: Em vez de ir buscar todas as pessoas ao repositório,
+  // lemos diretamente o perfil ativo na sessão!
+  final _sessao = getIt<SessaoUsuario>();
 
   @override
   void initState() {
     super.initState();
-    _carregarDados();
+    // Ouve as alterações de sessão para atualizar a lista se o perfil mudar
+    _sessao.addListener(_atualizarTela);
   }
 
-  void _carregarDados() {
-    setState(() {
-      _listaPessoas = _repo.listarPessoas();
-    });
+  @override
+  void dispose() {
+    _sessao.removeListener(_atualizarTela);
+    super.dispose();
+  }
+
+  void _atualizarTela() {
+    if (mounted) setState(() {});
   }
 
   @override
   Widget build(BuildContext context) {
+    final usuario = _sessao.usuarioAtivo;
+
     return Scaffold(
-      // 🔹 A Lista de Pessoas e Atividades
       body:
-          _listaPessoas.isEmpty
-              ? const Center(child: Text("Nenhum usuário cadastrado."))
+          usuario == null
+              // Se não há ninguém selecionado
+              ? const Center(
+                child: Text(
+                  "Nenhum perfil ativo.\nSelecione um perfil no ecrã inicial.",
+                  textAlign: TextAlign.center,
+                ),
+              )
+              // Se o utilizador não tem atividades
+              : usuario.atividades.isEmpty
+              ? Center(
+                child: Text(
+                  "Olá, ${usuario.nome}!\nAinda não registaste nenhuma atividade.",
+                  textAlign: TextAlign.center,
+                ),
+              )
+              // Se tem atividades, mostra a lista dele!
               : SafeArea(
                 child: ListView.builder(
-                  itemCount: _listaPessoas.length,
+                  itemCount: usuario.atividades.length,
                   itemBuilder: (_, index) {
-                    final pessoa = _listaPessoas[index];
-                    return Card(
-                      margin: const EdgeInsets.all(8),
-                      child: ExpansionTile(
-                        leading: const Icon(
-                          Icons.directions_run,
-                          color: Colors.orange,
+                    // Vamos inverter a ordem para ver a mais recente primeiro
+                    final atividade =
+                        usuario.atividades[usuario.atividades.length -
+                            1 -
+                            index];
+
+                    return Dismissible(
+                      key: Key('ativ_${atividade.data.millisecondsSinceEpoch}'),
+                      direction: DismissDirection.endToStart,
+                      background: Container(
+                        color: Colors.red,
+                        alignment: Alignment.centerRight,
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        child: const Icon(Icons.delete, color: Colors.white),
+                      ),
+                      onDismissed: (direction) {
+                        // 🔥 Apaga a atividade e guarda as alterações no perfil
+                        setState(() {
+                          usuario.atividades.remove(atividade);
+                          usuario.save();
+                        });
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Atividade removida!')),
+                        );
+                      },
+                      child: Card(
+                        margin: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
                         ),
-                        title: Text(
-                          pessoa.nome,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 18,
+                        child: ListTile(
+                          leading: const Icon(
+                            Icons.local_fire_department,
+                            color: Colors.deepOrange,
+                            size: 32,
+                          ),
+                          title: Text(
+                            "${atividade.tipo} (${atividade.duracao} min)",
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          subtitle: Text(
+                            "Intensidade: ${atividade.intensidade}\n"
+                            "Data: ${atividade.data.day}/${atividade.data.month}/${atividade.data.year}",
+                          ),
+                          trailing: Text(
+                            atividade.caloriasGastas != null
+                                ? "${atividade.caloriasGastas!.toStringAsFixed(0)} kcal"
+                                : "---",
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.orange,
+                              fontSize: 16,
+                            ),
                           ),
                         ),
-                        children:
-                            pessoa.atividades.isEmpty
-                                ? [
-                                  const Padding(
-                                    padding: EdgeInsets.all(16.0),
-                                    child: Text(
-                                      "Nenhuma atividade registrada.",
-                                      style: TextStyle(color: Colors.grey),
-                                    ),
-                                  ),
-                                ]
-                                : pessoa.atividades.map((atividade) {
-                                  return ListTile(
-                                    // Ícone de fogo para representar as calorias
-                                    leading: const Icon(
-                                      Icons.local_fire_department,
-                                      color: Colors.deepOrange,
-                                    ),
-                                    title: Text(
-                                      "${atividade.tipo} (${atividade.duracao} min)",
-                                    ),
-                                    subtitle: Text(
-                                      "Intensidade: ${atividade.intensidade}\n"
-                                      "Data: ${atividade.data.day}/${atividade.data.month}/${atividade.data.year}",
-                                    ),
-                                    // Mostra as calorias calculadas à direita
-                                    trailing: Text(
-                                      atividade.caloriasGastas != null
-                                          ? "${atividade.caloriasGastas!.toStringAsFixed(0)} kcal"
-                                          : "---",
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.orange,
-                                        fontSize: 16,
-                                      ),
-                                    ),
-                                  );
-                                }).toList(),
                       ),
                     );
                   },

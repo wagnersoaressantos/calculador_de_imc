@@ -1,4 +1,5 @@
 import 'package:calculadora_imc/model/registro_imc_model.dart';
+import 'package:calculadora_imc/model/atividade_model.dart'; // 🔥 Importação necessária!
 import 'package:hive/hive.dart';
 
 part 'pessoa_model.g.dart';
@@ -11,8 +12,6 @@ class PessoaModel extends HiveObject {
   @HiveField(1)
   List<RegistroImcModel> registros;
 
-  // 🔥 NOVOS CAMPOS ADICIONADOS PARA A FASE 3 (SISTEMA DE PERFIS)
-
   @HiveField(2, defaultValue: 0.0)
   double alturaPadrao;
 
@@ -22,6 +21,10 @@ class PessoaModel extends HiveObject {
   @HiveField(4, defaultValue: "Manter")
   String objetivo;
 
+  // 🔥 NOVO: A lista de atividades associada exclusivamente a este perfil!
+  @HiveField(5)
+  List<AtividadeModel> atividades;
+
   // Construtor atualizado
   PessoaModel({
     required this.nome,
@@ -29,5 +32,8 @@ class PessoaModel extends HiveObject {
     this.alturaPadrao = 0.0,
     this.pesoMeta = 0.0,
     this.objetivo = "Manter",
-  });
+    List<AtividadeModel>? atividades, // Opcional no momento da criação
+  }) : atividades =
+           atividades ??
+           []; // Se for nulo, cria uma lista vazia para evitar erros
 }

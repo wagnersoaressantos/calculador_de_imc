@@ -1,14 +1,12 @@
-import 'dart:math';
-
-import 'package:calculadora_imc/model/pessoa_model.dart';
+import 'package:calculadora_imc/calcularIMC/calculador_de_imc.dart';
 import 'package:calculadora_imc/model/registro_imc_model.dart';
-import 'package:calculadora_imc/repository/pessoa_repository.dart';
-import 'package:calculadora_imc/repository/configuracoes_repository.dart'; // 🔥 Importamos o repositório das metas
+import 'package:calculadora_imc/model/sessao_usuario.dart';
 import 'package:calculadora_imc/service/atividade_analise_service.dart';
 import 'package:calculadora_imc/service/imc_analise_service.dart';
 import 'package:calculadora_imc/service_locator.dart';
-import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
+import 'package:fl_chart/fl_chart.dart';
+import 'dart:math';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -18,519 +16,387 @@ class DashboardPage extends StatefulWidget {
 }
 
 class _DashboardPageState extends State<DashboardPage> {
-  final _repo = getIt<PessoaRepository>();
-  final _analise = ImcAnaliseService();
-  final _atividadeAnalise = AtividadeAnaliseService();
-
-  List<PessoaModel> _pessoas = [];
-
-  // 🔥 Novas variáveis para guardar a meta e o objetivo que vêm das configurações
-  double _pesoMeta = 0;
-  String _objetivo = "Manter";
+  // 💡 DEPENDÊNCIAS: Apenas a sessão e os serviços de análise!
+  final _sessao = getIt<SessaoUsuario>();
+  final _imcService = ImcAnaliseService();
+  final _atividadeService = AtividadeAnaliseService();
 
   @override
   void initState() {
     super.initState();
-    _carregarDados();
-  }
-
-  // 🔥 Transformamos esta função em "async" para poder ir buscar os dados das configurações
-  void _carregarDados() async {
-    final pessoas = _repo.listarPessoas();
-
-    // Vamos ler a configuração salva pelo utilizador
-    final configRepo = await ConfiguracoesRepository.load();
-    final config = configRepo.pegarDados();
-
-    setState(() {
-      _pessoas = pessoas;
-      _pesoMeta = config.pesoMeta;
-      _objetivo = config.objetivo;
-    });
-  }
-
-  // 🔹 Converte registros em pontos para o gráfico
-  List<FlSpot> _gerarPontos(PessoaModel pessoa) {
-    List<FlSpot> pontos = [];
-    for (int i = 0; i < pessoa.registros.length; i++) {
-      final registro = pessoa.registros[i];
-      pontos.add(FlSpot(i.toDouble(), registro.imc));
-    }
-    return pontos;
+    // 💡 Escuta as mudanças de perfil. Se a pessoa ativa mudar, o Dashboard redesenha-se!
+    _sessao.addListener(_atualizarDashboard);
   }
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Dashboard IMC')),
-      body:
-          _pessoas.isEmpty
-              ? const Center(child: Text("Sem dados para exibir"))
-              : ListView.builder(
-                itemCount: _pessoas.length,
-                itemBuilder: (context, index) {
-                  final pessoa = _pessoas[index];
-                  return Card(
-                    margin: const EdgeInsets.all(12),
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        children: [
-                          Row(
-                            children: [
-                              const Icon(Icons.person, color: Colors.blue),
-                              const SizedBox(width: 8),
-                              Text(
-                                pessoa.nome,
-                                style: const TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
-                          ),
-
-                          const SizedBox(height: 20),
-
-                          // 🔥 GRÁFICO (Mantido igual)
-                          SizedBox(
-                            height: 200,
-                            child: LineChart(
-                              LineChartData(
-                                gridData: FlGridData(show: true),
-                                borderData: FlBorderData(show: false),
-                                lineBarsData: [
-                                  LineChartBarData(
-                                    spots: _gerarPontos(pessoa),
-                                    isCurved: true,
-                                    color: Colors.blue,
-                                    dotData: FlDotData(show: true),
-                                    belowBarData: BarAreaData(
-                                      show: true,
-                                      color: Colors.blue.withOpacity(0.2),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 20),
-
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              _infoBox(
-                                "Média",
-                                _analise
-                                    .calcularMedia(pessoa.registros)
-                                    .toStringAsFixed(2),
-                                Icons.analytics,
-                              ),
-                              _infoBox(
-                                "Tendência",
-                                _analise.calcularTendencia(pessoa.registros),
-                                Icons.trending_up,
-                              ),
-                            ],
-                          ),
-
-                          const SizedBox(height: 10),
-
-                          // 🔥 O SEU NOVO CARTÃO DE META COMEÇA AQUI 🔥
-                          // Só mostra este cartão se a pessoa tiver IMCs registados e tiver configurado uma meta maior que zero
-                          if (pessoa.registros.isNotEmpty && _pesoMeta > 0)
-                            Builder(
-                              builder: (context) {
-                                final ultimoPeso = pessoa.registros.last.peso;
-                                double diferenca = ultimoPeso - _pesoMeta;
-                                String mensagem = "";
-                                Color corCartao = Colors.green;
-                                IconData iconeCartao = Icons.flag;
-
-                                // Inteligência para saber se é emagrecer, hipertrofia ou manter
-                                if (_objetivo == "Emagrecer") {
-                                  if (diferenca > 0) {
-                                    mensagem =
-                                        "Faltam ${diferenca.toStringAsFixed(1)}kg para a sua meta de $_pesoMeta kg!";
-                                    corCartao =
-                                        Colors
-                                            .orange; // Ainda não chegou, fica laranja
-                                  } else {
-                                    mensagem =
-                                        "Parabéns! Você atingiu a meta de emagrecimento!";
-                                    corCartao =
-                                        Colors.green; // Chegou, fica verde
-                                    iconeCartao =
-                                        Icons
-                                            .emoji_events; // Troca para um troféu!
-                                  }
-                                } else if (_objetivo == "Hipertrofia") {
-                                  if (diferenca < 0) {
-                                    mensagem =
-                                        "Faltam ${(diferenca * -1).toStringAsFixed(1)}kg para a sua meta de $_pesoMeta kg!";
-                                    corCartao = Colors.orange;
-                                  } else {
-                                    mensagem =
-                                        "Parabéns! Você alcançou a sua meta de ganho de massa!";
-                                    corCartao = Colors.green;
-                                    iconeCartao = Icons.emoji_events;
-                                  }
-                                } else {
-                                  mensagem =
-                                      "O seu objetivo é manter o peso na faixa saudável!";
-                                  corCartao = Colors.blue;
-                                  iconeCartao = Icons.balance;
-                                }
-
-                                return Container(
-                                  width: double.infinity,
-                                  padding: const EdgeInsets.all(12),
-                                  margin: const EdgeInsets.only(
-                                    bottom: 10,
-                                  ), // Espaço por baixo
-                                  decoration: BoxDecoration(
-                                    color: corCartao.withOpacity(0.1),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      Icon(iconeCartao, color: corCartao),
-                                      const SizedBox(width: 10),
-                                      Expanded(
-                                        child: Text(
-                                          mensagem,
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            color: corCartao,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                );
-                              },
-                            ),
-
-                          // 🔥 FIM DO CARTÃO DE META 🔥
-                          Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: Colors.orange.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Row(
-                              children: [
-                                const Icon(
-                                  Icons.psychology,
-                                  color: Colors.orange,
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: Text(
-                                    _analise.preverMeta(pessoa.registros),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-
-                          const SizedBox(height: 10),
-
-                          Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: Colors.green.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Row(
-                              children: [
-                                const Icon(
-                                  Icons.lightbulb,
-                                  color: Colors.green,
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: Text(
-                                    _atividadeAnalise.gerarInsightCompleto(
-                                      pessoa,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                },
-              ),
-    );
+  void dispose() {
+    // 💡 Limpeza para não gastar memória quando o ecrã for fechado
+    _sessao.removeListener(_atualizarDashboard);
+    super.dispose();
   }
-}
 
-// OS SEUS COMPONENTES AUXILIARES FORAM MANTIDOS INTACTOS AQUI PARA BAIXO...
+  void _atualizarDashboard() {
+    if (mounted) setState(() {});
+  }
 
-Widget _infoBox(String titulo, String valor, IconData icone) {
-  return Expanded(
-    child: Container(
-      margin: const EdgeInsets.all(4),
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: Colors.blue.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icone, color: Colors.blue),
-          const SizedBox(height: 5),
-          Text(titulo, style: const TextStyle(fontWeight: FontWeight.bold)),
-          const SizedBox(height: 5),
-          Text(
-            valor,
-            textAlign: TextAlign.center,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 12),
-          ),
-        ],
-      ),
-    ),
-  );
-}
+  // ------------------------------------------------------------------------
+  // WIDGETS AUXILIARES (CARDS)
+  // ------------------------------------------------------------------------
 
-// Pode manter as classes _DashboardHeader, _DashboardChartCard, _RecentRecordsCard e _DashboardEmptyState que tem no seu código caso precise usá-las,
-// elas não influenciam no resultado final desta listagem.
-class _DashboardHeader extends StatelessWidget {
-  const _DashboardHeader({
-    required this.nome,
-    required this.totalRegistros,
-    required this.ultimoImc,
-  });
-
-  final String nome;
-  final int totalRegistros;
-  final double ultimoImc;
-
-  @override
-  Widget build(BuildContext context) {
+  // 💡 Cria os pequenos cartões coloridos no topo do Dashboard
+  Widget _buildSummaryCard(
+    String title,
+    String value,
+    IconData icon,
+    Color color,
+  ) {
     return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(16.0),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(nome, style: Theme.of(context).textTheme.headlineSmall),
-            const SizedBox(height: 8),
-            Text('Total de registros: $totalRegistros'),
-            Text('Último IMC: ${ultimoImc.toStringAsFixed(2)}'),
+            Icon(icon, size: 40, color: color),
+            const SizedBox(height: 10),
+            Text(
+              title,
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey,
+              ),
+            ),
+            const SizedBox(height: 5),
+            Text(
+              value,
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
+            ),
           ],
         ),
       ),
     );
   }
-}
 
-class _DashboardChartCard extends StatelessWidget {
-  const _DashboardChartCard({required this.registros});
+  // 💡 Cria o cartão que mostra o quão perto a pessoa está da sua meta de peso
+  Widget _buildProgressoMetaCard(
+    double pesoAtual,
+    double pesoMeta,
+    String objetivo,
+  ) {
+    if (pesoMeta <= 0)
+      return const SizedBox.shrink(); // Não mostra se não houver meta configurada
 
-  final List<RegistroImcModel> registros;
+    double diferenca = pesoAtual - pesoMeta;
+    String statusTexto = "";
+    Color corStatus = Colors.blue;
+    double progresso = 0.0;
 
-  @override
-  Widget build(BuildContext context) {
-    // Prepara os pontos com X sequencial e Y igual ao valor de IMC.
-    final spots =
-        registros.asMap().entries.map((entry) {
-          return FlSpot(entry.key.toDouble(), entry.value.imc);
-        }).toList();
-
-    final minY = registros.map((registro) => registro.imc).reduce(min);
-    final maxY = registros.map((registro) => registro.imc).reduce(max);
-    final maxX = max(1.0, (spots.length - 1).toDouble());
-    final verticalPadding = max(1.0, (maxY - minY) * 0.15);
+    // Lógica inteligente de progresso baseada no Objetivo do Perfil
+    if (objetivo == "Emagrecer") {
+      if (diferenca <= 0) {
+        statusTexto = "Parabéns! Meta Alcançada!";
+        corStatus = Colors.green;
+        progresso = 1.0;
+      } else {
+        statusTexto = "Faltam ${diferenca.toStringAsFixed(1)} kg para a meta.";
+        corStatus = Colors.orange;
+        // Progresso ilustrativo (num cenário real compararia com o peso inicial)
+        progresso = 0.5;
+      }
+    } else if (objetivo == "Hipertrofia") {
+      if (diferenca >= 0) {
+        statusTexto = "Parabéns! Meta Alcançada!";
+        corStatus = Colors.green;
+        progresso = 1.0;
+      } else {
+        statusTexto =
+            "Faltam ${diferenca.abs().toStringAsFixed(1)} kg para a meta.";
+        corStatus = Colors.blueAccent;
+        progresso = 0.5;
+      }
+    } else {
+      statusTexto =
+          "A manter o peso em torno de ${pesoMeta.toStringAsFixed(1)} kg.";
+      corStatus = Colors.teal;
+      progresso = 1.0;
+    }
 
     return Card(
+      elevation: 2,
+      margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Evolução do IMC',
-              style: Theme.of(context).textTheme.titleMedium,
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  "Progresso da Meta",
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                Icon(Icons.flag, color: corStatus),
+              ],
             ),
-            const SizedBox(height: 16),
-            SizedBox(
-              height: 280,
-              child: LineChart(
-                LineChartData(
-                  minX: 0,
-                  maxX: maxX,
-                  minY: minY - verticalPadding,
-                  maxY: maxY + verticalPadding,
-                  gridData: FlGridData(
-                    show: true,
-                    drawVerticalLine: false,
-                    horizontalInterval: _calculateInterval(minY, maxY),
-                  ),
-                  borderData: FlBorderData(show: false),
-                  titlesData: FlTitlesData(
-                    topTitles: const AxisTitles(
-                      sideTitles: SideTitles(showTitles: false),
-                    ),
-                    rightTitles: const AxisTitles(
-                      sideTitles: SideTitles(showTitles: false),
-                    ),
-                    leftTitles: AxisTitles(
-                      sideTitles: SideTitles(
-                        showTitles: true,
-                        reservedSize: 42,
-                        interval: _calculateInterval(minY, maxY),
-                        getTitlesWidget: (value, meta) {
-                          return SideTitleWidget(
-                            meta: meta,
-                            child: Text(value.toStringAsFixed(1)),
-                          );
-                        },
-                      ),
-                    ),
-                    bottomTitles: AxisTitles(
-                      sideTitles: SideTitles(
-                        showTitles: true,
-                        reservedSize: 34,
-                        interval: _bottomInterval(registros.length),
-                        // Mostra a data resumida para não poluir o eixo X.
-                        getTitlesWidget: (value, meta) {
-                          final index = value.toInt();
-                          if (index < 0 || index >= registros.length) {
-                            return const SizedBox.shrink();
-                          }
+            const SizedBox(height: 10),
+            Text(
+              statusTexto,
+              style: TextStyle(
+                fontSize: 14,
+                color: corStatus,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(height: 10),
+            LinearProgressIndicator(
+              value: progresso,
+              backgroundColor: Colors.grey[300],
+              valueColor: AlwaysStoppedAnimation<Color>(corStatus),
+              minHeight: 10,
+              borderRadius: BorderRadius.circular(5),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
-                          return SideTitleWidget(
-                            meta: meta,
-                            space: 8,
-                            child: Text(_formatDate(registros[index].data)),
-                          );
-                        },
-                      ),
+  // ------------------------------------------------------------------------
+  // CONSTRUÇÃO PRINCIPAL
+  // ------------------------------------------------------------------------
+
+  @override
+  Widget build(BuildContext context) {
+    // 💡 Acesso ao Perfil Dinâmico: Todos os dados desta página vêm daqui!
+    final usuario = _sessao.usuarioAtivo;
+
+    // 💡 CENÁRIO: Ninguém logado (Prevenção de Erros de Tela Vazia)
+    if (usuario == null) {
+      return const Center(
+        child: Text(
+          "Bem-vindo ao IMC+!\nSelecione ou crie um perfil no topo.",
+          textAlign: TextAlign.center,
+        ),
+      );
+    }
+
+    // 💡 Recupera os dados exclusivos do utilizador selecionado
+    final registros = usuario.registros;
+    final temRegistos = registros.isNotEmpty;
+
+    final ultimoImc = temRegistos ? registros.last.imc : 0.0;
+    final ultimoPeso = temRegistos ? registros.last.peso : 0.0;
+
+    // Cálculo do total de minutos de atividade da pessoa logada
+    int tempoTotalAtividades = 0;
+    for (var ativ in usuario.atividades) {
+      tempoTotalAtividades += ativ.duracao;
+    }
+
+    return Scaffold(
+      body: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // SAUDAÇÃO PERSONALIZADA
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Text(
+                "Resumo de ${usuario.nome}",
+                style: const TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+
+            // CARDS SUPERIORES
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _buildSummaryCard(
+                      "Último IMC",
+                      temRegistos ? ultimoImc.toStringAsFixed(1) : "--",
+                      Icons.speed,
+                      temRegistos
+                          ? (ultimoImc >= 18.5 && ultimoImc < 25
+                              ? Colors.green
+                              : Colors.orange)
+                          : Colors.grey,
                     ),
                   ),
-                  lineBarsData: [
-                    LineChartBarData(
-                      spots: spots,
-                      isCurved: false,
-                      barWidth: 3,
-                      color: Theme.of(context).colorScheme.primary,
-                      dotData: const FlDotData(show: true),
-                      belowBarData: BarAreaData(
-                        show: true,
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.primary.withOpacity(0.12),
-                      ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: _buildSummaryCard(
+                      "Min. Ativos",
+                      tempoTotalAtividades > 0 ? "$tempoTotalAtividades" : "0",
+                      Icons.local_fire_department,
+                      tempoTotalAtividades > 0 ? Colors.redAccent : Colors.grey,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 10),
+
+            // 💡 CARTÃO DE META DE PESO
+            if (temRegistos && usuario.pesoMeta > 0)
+              _buildProgressoMetaCard(
+                ultimoPeso,
+                usuario.pesoMeta,
+                usuario.objetivo,
+              ),
+
+            const SizedBox(height: 20),
+
+            // GRÁFICO DE EVOLUÇÃO
+            if (registros.length >= 2) ...[
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16.0),
+                child: Text(
+                  "Evolução do IMC",
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+              ),
+              const SizedBox(height: 10),
+              _construirGrafico(registros),
+            ] else ...[
+              const Padding(
+                padding: EdgeInsets.all(24.0),
+                child: Text(
+                  "Adicione pelo menos 2 medições de IMC para ver o gráfico de evolução.",
+                  style: TextStyle(
+                    fontStyle: FontStyle.italic,
+                    color: Colors.grey,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ],
+
+            const SizedBox(height: 20),
+
+            // ANÁLISE DE INSIGHTS (Lida dos Serviços)
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16.0),
+              child: Text(
+                "Insights de Saúde",
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+            ),
+            Card(
+              margin: const EdgeInsets.all(16.0),
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // 🔥 CORREÇÃO DA LINHA 305: A função certa chama-se 'calcularTendencia' e pede a lista de registros!
+                    Text(
+                      "💡 ${_imcService.calcularTendencia(usuario.registros)}",
+                      style: const TextStyle(fontSize: 15),
+                    ),
+                    const Divider(),
+                    Text(
+                      "💪 ${_atividadeService.atividadeMaisFrequente(usuario)}",
+                      style: const TextStyle(fontSize: 15),
+                    ),
+                    const Divider(),
+                    Text(
+                      "📊 ${_atividadeService.impactoNoImc(usuario)}",
+                      style: const TextStyle(fontSize: 15),
                     ),
                   ],
                 ),
               ),
             ),
+            const SizedBox(height: 20),
           ],
         ),
       ),
     );
   }
 
-  static double _calculateInterval(double minY, double maxY) {
-    final difference = maxY - minY;
-    if (difference <= 2) {
-      return 0.5;
-    }
-    if (difference <= 5) {
-      return 1;
-    }
-    return 2;
-  }
+  // ------------------------------------------------------------------------
+  // LÓGICA DO GRÁFICO (FL_CHART)
+  // ------------------------------------------------------------------------
+  Widget _construirGrafico(List<RegistroImcModel> registros) {
+    List<double> valoresImc = registros.map((r) => r.imc).toList();
+    double minImc = valoresImc.reduce(min);
+    double maxImc = valoresImc.reduce(max);
 
-  static double _bottomInterval(int totalRegistros) {
-    if (totalRegistros <= 4) {
-      return 1;
-    }
-    if (totalRegistros <= 8) {
-      return 2;
-    }
-    return (totalRegistros / 4).ceilToDouble();
-  }
+    double minY = (minImc - 1.0).floorToDouble();
+    double maxY = (maxImc + 1.0).ceilToDouble();
 
-  static String _formatDate(DateTime date) {
-    final day = date.day.toString().padLeft(2, '0');
-    final month = date.month.toString().padLeft(2, '0');
-    return '$day/$month';
-  }
-}
+    List<FlSpot> pontos =
+        registros
+            .asMap()
+            .entries
+            .map((e) => FlSpot(e.key.toDouble(), e.value.imc))
+            .toList();
 
-class _RecentRecordsCard extends StatelessWidget {
-  const _RecentRecordsCard({required this.registros});
-
-  final List<RegistroImcModel> registros;
-
-  @override
-  Widget build(BuildContext context) {
-    final ultimosRegistros = registros.reversed.take(5).toList();
-
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Últimos registros',
-              style: Theme.of(context).textTheme.titleMedium,
+    return Container(
+      height: 200,
+      padding: const EdgeInsets.only(right: 20.0, left: 10.0),
+      child: LineChart(
+        LineChartData(
+          minY: minY,
+          maxY: maxY,
+          gridData: FlGridData(
+            show: true,
+            drawVerticalLine: false,
+            horizontalInterval: 1.0,
+          ),
+          titlesData: FlTitlesData(
+            bottomTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false),
             ),
-            const SizedBox(height: 12),
-            ...ultimosRegistros.map((registro) {
-              return ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.monitor_weight_outlined),
-                title: Text('IMC ${registro.imc.toStringAsFixed(2)}'),
-                subtitle: Text(
-                  'Peso ${registro.peso.toStringAsFixed(1)} kg • ${_DashboardChartCard._formatDate(registro.data)}',
-                ),
-              );
-            }),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _DashboardEmptyState extends StatelessWidget {
-  const _DashboardEmptyState({required this.message});
-
-  final String message;
-
-  @override
-  Widget build(BuildContext context) {
-    // Trata os cenários sem dados sem quebrar a navegação da tela.
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.insert_chart_outlined,
-              size: 64,
-              color: Theme.of(context).colorScheme.primary,
+            topTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false),
             ),
-            const SizedBox(height: 16),
-            Text(
-              message,
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.titleMedium,
+            rightTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false),
+            ),
+            leftTitles: AxisTitles(
+              sideTitles: SideTitles(
+                showTitles: true,
+                reservedSize: 35,
+                interval: 1.0,
+                getTitlesWidget: (value, meta) {
+                  return SideTitleWidget(
+                    meta: meta,
+                    space: 5.0,
+                    child: Text(
+                      value.toStringAsFixed(0),
+                      style: const TextStyle(color: Colors.grey, fontSize: 12),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+          borderData: FlBorderData(show: false),
+          lineBarsData: [
+            LineChartBarData(
+              spots: pontos,
+              isCurved: true,
+              color: Colors.blue,
+              barWidth: 3,
+              isStrokeCapRound: true,
+              belowBarData: BarAreaData(
+                show: true,
+                color: Colors.blue.withOpacity(0.2),
+              ),
             ),
           ],
         ),
